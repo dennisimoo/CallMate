@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { triggerCall } from './api';
+import { triggerCall, getHistory, getCallTranscript } from './api';
 
 const MAX_CALLS = 3;
 const CALLS_KEY = 'callmate_calls_left';
 const PHONE_KEY = 'callmate_phone';
-const HISTORY_KEY = 'callmate_history';
 
+// Hardcode to America/Los_Angeles (PST/PDT)
 function getPSTTimeString(iso) {
   try {
     return new Date(iso).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
@@ -23,16 +23,48 @@ function App() {
     const val = localStorage.getItem(CALLS_KEY);
     return val ? parseInt(val, 10) : MAX_CALLS;
   });
-  const [history, setHistory] = useState(() => {
-    const val = localStorage.getItem(HISTORY_KEY);
-    return val ? JSON.parse(val) : [];
-  });
+  const [history, setHistory] = useState([]);
+  const [alignedTrans, setAlignedTrans] = useState({}); // {call_id: [ {speaker, text} ] }
+  const [transcriptLoading, setTranscriptLoading] = useState({}); // {call_id: boolean}
+  const [transcriptError, setTranscriptError] = useState({}); // {call_id: string}
+
+  useEffect(() => {
+    if (phone) {
+      getHistory(phone).then(h => setHistory(h)).catch(() => setHistory([]));
+    }
+  }, [phone, status]);
 
   useEffect(() => {
     localStorage.setItem(CALLS_KEY, callsLeft);
     localStorage.setItem(PHONE_KEY, phone);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-  }, [callsLeft, phone, history]);
+  }, [callsLeft, phone]);
+
+  // Auto-refresh transcript for successful calls
+  useEffect(() => {
+    const interval = setInterval(() => {
+      history.forEach(call => {
+        if (call.call_id && call.status === 'success') {
+          setTranscriptLoading(tl => ({ ...tl, [call.call_id]: true }));
+          getCallTranscript(call.call_id).then(data => {
+            if (Array.isArray(data.aligned) && data.aligned.length > 0) {
+              setAlignedTrans(at => ({ ...at, [call.call_id]: data.aligned }));
+              setTranscriptLoading(tl => ({ ...tl, [call.call_id]: false }));
+              setTranscriptError(errs => ({ ...errs, [call.call_id]: undefined }));
+            } else if (data.status === 'error' || data.message) {
+              setTranscriptError(errs => ({ ...errs, [call.call_id]: data.message || 'Transcript error.' }));
+              setTranscriptLoading(tl => ({ ...tl, [call.call_id]: false }));
+            } else {
+              setTranscriptLoading(tl => ({ ...tl, [call.call_id]: true }));
+            }
+          }).catch(err => {
+            setTranscriptError(errs => ({ ...errs, [call.call_id]: (err && err.message) || 'Transcript fetch error.' }));
+            setTranscriptLoading(tl => ({ ...tl, [call.call_id]: false }));
+          });
+        }
+      });
+    }, 3000); // every 3 seconds for more real-time feel
+    return () => clearInterval(interval);
+  }, [history]);
 
   const handleCall = async (e) => {
     e.preventDefault();
@@ -44,20 +76,15 @@ function App() {
         setLoading(false);
         return;
       }
-      const timestamp = new Date().toISOString();
       const res = await triggerCall(phone, topic);
-      const newCall = {
-        topic,
-        status: res.message === 'Bland.ai call triggered!' ? 'success' : 'blocked',
-        timestamp,
-        call_id: res.call_id || null
-      };
-      setHistory(h => [...h, newCall]);
       setStatus(res.message === 'Bland.ai call triggered!' ? 'Call triggered.' : res.message);
-      setCallsLeft(c => c - 1);
+      setCallsLeft(res.calls_left);
       setTopic('');
     } catch (err) {
-      setStatus(err.message || 'Error making call.');
+      let msg = err.message;
+      if (msg.includes('Call topic rejected')) msg = 'This topic is not allowed. Please enter a safe, appropriate topic.';
+      if (msg.includes('Call limit reached')) msg = 'You have reached the maximum number of calls.';
+      setStatus(msg);
     }
     setLoading(false);
   };
@@ -97,6 +124,21 @@ function App() {
                   <b>{call.topic}</b> <span style={{color: call.status === 'success' ? '#388e3c' : '#b00020'}}>({call.status})</span>
                   {call.timestamp && <span style={{marginLeft: 6, color: '#888'}}>{getPSTTimeString(call.timestamp)}</span>}
                 </div>
+                {call.call_id && (
+                  <div style={{fontSize: 12, color: '#444', background: '#f5f5f5', borderRadius: 5, padding: 7, marginTop: 5, whiteSpace: 'pre-wrap', minHeight: 28}}>
+                    {transcriptError[call.call_id] && (
+                      <div style={{color: '#b00020', fontStyle: 'italic'}}>Transcript error: {transcriptError[call.call_id]}</div>
+                    )}
+                    {transcriptLoading[call.call_id] && (!alignedTrans[call.call_id] || alignedTrans[call.call_id].length === 0) && !transcriptError[call.call_id] && (
+                      <div style={{color: '#888', fontStyle: 'italic'}}>Waiting for transcript...</div>
+                    )}
+                    {alignedTrans[call.call_id] && alignedTrans[call.call_id].length > 0 && alignedTrans[call.call_id].map((seg, j) => (
+                      <div key={j} style={{marginBottom: 2}}>
+                        <b style={{color: seg.speaker === 'user' ? '#1976d2' : '#43a047'}}>{seg.speaker === 'user' ? 'User' : 'Agent'}:</b> {seg.text}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
