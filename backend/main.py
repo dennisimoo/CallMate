@@ -1,6 +1,7 @@
 import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import requests
 from dotenv import load_dotenv
@@ -62,6 +63,12 @@ def moderate_call(topic: str):
         return False
     except Exception:
         raise HTTPException(status_code=500, detail="Gemini API response parsing error.")
+
+# Path to the frontend build directory
+frontend_build_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "build")
+
+# Serve React static files
+app.mount("/", StaticFiles(directory=frontend_build_dir, html=True), name="static")
 
 @app.post("/call")
 def trigger_call(req: CallRequest):

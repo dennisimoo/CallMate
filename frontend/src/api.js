@@ -1,5 +1,5 @@
-
-const API_BASE = 'https://callmate-cdtz.onrender.com';
+// Simple API utility for backend calls
+const API_BASE = '';
 
 export async function triggerCall(phone_number, topic) {
   const res = await fetch(`${API_BASE}/call`, {
