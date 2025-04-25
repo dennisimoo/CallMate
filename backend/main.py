@@ -73,10 +73,9 @@ def moderate_call(topic: str):
 # Path to the frontend build directory
 frontend_build_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "build")
 
-# Serve React static files
-app.mount("/", StaticFiles(directory=frontend_build_dir, html=True), name="static")
+# IMPORTANT: Define API routes BEFORE mounting static files
 
-@app.post("/call")
+@app.post("/api/call")
 def trigger_call(req: CallRequest):
     if not BLAND_API_KEY:
         raise HTTPException(status_code=500, detail="BLAND_API_KEY not set in environment.")
@@ -144,14 +143,14 @@ def trigger_call(req: CallRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error calling Bland.ai: {e}")
 
-@app.get("/history/{phone_number}")
+@app.get("/api/history/{phone_number}")
 def get_history(phone_number: str):
     """Get call history for a specific phone number"""
     if phone_number not in call_history:
         return []
     return call_history[phone_number]
 
-@app.get("/call_details/{call_id}")
+@app.get("/api/call_details/{call_id}")
 def get_call_details(call_id: str):
     """Get details for a specific call from Bland.ai"""
     if not BLAND_API_KEY:
@@ -169,7 +168,7 @@ def get_call_details(call_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting call details: {str(e)}")
 
-@app.get("/call_transcript/{call_id}")
+@app.get("/api/call_transcript/{call_id}")
 def get_call_transcript(call_id: str):
     """Get call transcript for a specific call"""
     if not BLAND_API_KEY:
@@ -211,3 +210,7 @@ def get_call_transcript(call_id: str):
             return {"status": "pending", "message": "Transcript not available yet"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting call transcript: {str(e)}")
+
+# IMPORTANT: Mount static files AFTER defining all API routes
+# Serve React static files
+app.mount("/", StaticFiles(directory=frontend_build_dir, html=True), name="static")
