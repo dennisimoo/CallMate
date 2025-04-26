@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { triggerCall, getHistory, getCallTranscript, getCallDetails, getCallRecording } from './api';
 
-const MAX_CALLS = 3;
+const MAX_CALLS = 5;
 const CALLS_KEY = 'voxio_calls_left';
 const PHONE_KEY = 'voxio_phone';
 const ADMIN_KEY = 'voxio_admin';
