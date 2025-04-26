@@ -1,5 +1,5 @@
 // Simple API utility for backend calls
-const API_BASE = 'http://localhost:8000';
+const API_BASE = ''; // Empty string for relative URL to work on any domain
 
 export async function triggerCall(phone_number, topic, options = {}) {
   try {
