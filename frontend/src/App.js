@@ -185,13 +185,13 @@ function App() {
       <button type="submit" disabled={loading || (!isAdmin && callsLeft === 0)} style={{ padding: 10, fontSize: 17, borderRadius: 6, border: 'none', background: '#222', color: '#fff', cursor: loading || (!isAdmin && callsLeft === 0) ? 'not-allowed' : 'pointer' }}>
         {loading ? 'Calling...' : 'Call'}
       </button>
-      <div style={{ fontSize: 20, color: '#666', textAlign: 'center' }}>
+      <div style={{ fontSize: 20, color: '#6495ED', textAlign: 'center' }}>
         {isAdmin ? (
           <div>
             Admin Mode - Unlimited Calls
             <button 
               onClick={handleLogout} 
-              style={{ marginLeft: 8, fontSize: 12, padding: '2px 6px', border: 'none', background: '#6495ED', borderRadius: 4, cursor: 'pointer' }}
+              style={{ marginLeft: 8, fontSize: 12, padding: '2px 6px', border: 'none', background: '#f0f0f0', borderRadius: 4, cursor: 'pointer' }}
             >
               Logout
             </button>
