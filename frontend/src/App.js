@@ -278,7 +278,7 @@ function App() {
           }}
           style={{ display: 'flex', alignItems: 'center' }}
         >
-          <span style={{ fontSize: 12, color: darkMode ? '#ccc' : '#666' }}>by Dennis & Nicholas</span>
+          <span style={{ fontSize: 14, color: darkMode ? '#ccc' : '#666' }}>by Dennis K. & Nicholas L.</span>
         </motion.div>
       </div>
       
