@@ -67,7 +67,7 @@ function App() {
 
   // Update document title
   useEffect(() => {
-    document.title = "Voxio by Dennis & Nicholas";
+    document.title = "Plektu by Dennis & Nicholas";
   }, []);
 
   // Auto-refresh transcript for successful calls
@@ -159,12 +159,12 @@ function App() {
   const renderMainTab = () => (
     <form onSubmit={handleCall} style={{ background: '#fff', borderRadius: 10, boxShadow: '0 2px 16px #0001', padding: 28, width: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ margin: 0, color: '#222', fontWeight: 600, fontSize: 22, letterSpacing: -1 }}>Voxio</h2>
+        <h2 style={{ margin: 0, color: '#222', fontWeight: 600, fontSize: 22, letterSpacing: -1 }}>Plektu</h2>
         <span style={{ fontSize: 12, color: '#666' }}>by Dennis</span>
       </div>
       
       <div style={{ fontSize: 14, color: '#555', marginBottom: 5, lineHeight: 1.4 }}>
-        Voxio will connect a recipient to talk about anything you want. Just enter their phone number and a topic, and we'll call for you!
+        Plektu will connect a recipient to talk about anything you want. Just enter their phone number and a topic, and we'll call for you!
       </div>
       
       <input
