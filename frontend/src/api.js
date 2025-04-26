@@ -28,3 +28,9 @@ export async function getCallTranscript(call_id) {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function getCallRecording(call_id) {
+  const res = await fetch(`${API_BASE}/call_recording/${call_id}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

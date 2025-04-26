@@ -1,14 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { triggerCall, getHistory, getCallTranscript } from './api';
+import { triggerCall, getHistory, getCallTranscript, getCallDetails, getCallRecording } from './api';
 
 const MAX_CALLS = 3;
-const CALLS_KEY = 'callmate_calls_left';
-const PHONE_KEY = 'callmate_phone';
+const CALLS_KEY = 'voxio_calls_left';
+const PHONE_KEY = 'voxio_phone';
 
-// Hardcode to America/Los_Angeles (PST/PDT)
+// Fixed PST/PDT time conversion function
 function getPSTTimeString(iso) {
   try {
-    return new Date(iso).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
+    // Explicitly format with date and time components to ensure consistency
+    const options = { 
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    };
+    return new Date(iso).toLocaleString('en-US', options);
   } catch {
     return iso;
   }
@@ -27,6 +38,7 @@ function App() {
   const [alignedTrans, setAlignedTrans] = useState({}); // {call_id: [ {speaker, text} ] }
   const [transcriptLoading, setTranscriptLoading] = useState({}); // {call_id: boolean}
   const [transcriptError, setTranscriptError] = useState({}); // {call_id: string}
+  const [recordingUrls, setRecordingUrls] = useState({}); // {call_id: url}
 
   useEffect(() => {
     if (phone) {
@@ -39,11 +51,17 @@ function App() {
     localStorage.setItem(PHONE_KEY, phone);
   }, [callsLeft, phone]);
 
+  // Update document title
+  useEffect(() => {
+    document.title = "Voxio";
+  }, []);
+
   // Auto-refresh transcript for successful calls
   useEffect(() => {
     const interval = setInterval(() => {
       history.forEach(call => {
         if (call.call_id && call.status === 'success') {
+          // Fetch transcript
           setTranscriptLoading(tl => ({ ...tl, [call.call_id]: true }));
           getCallTranscript(call.call_id).then(data => {
             if (Array.isArray(data.aligned) && data.aligned.length > 0) {
@@ -60,11 +78,22 @@ function App() {
             setTranscriptError(errs => ({ ...errs, [call.call_id]: (err && err.message) || 'Transcript fetch error.' }));
             setTranscriptLoading(tl => ({ ...tl, [call.call_id]: false }));
           });
+          
+          // Fetch recording if we don't have it already
+          if (!recordingUrls[call.call_id]) {
+            getCallRecording(call.call_id).then(data => {
+              if (data.status === 'success' && data.recording_url) {
+                setRecordingUrls(urls => ({ ...urls, [call.call_id]: data.recording_url }));
+              }
+            }).catch(() => {
+              // Silently fail - recording might not be available yet
+            });
+          }
         }
       });
     }, 3000); // every 3 seconds for more real-time feel
     return () => clearInterval(interval);
-  }, [history]);
+  }, [history, recordingUrls]);
 
   const handleCall = async (e) => {
     e.preventDefault();
@@ -92,7 +121,7 @@ function App() {
   return (
     <div style={{ minHeight: '100vh', background: '#f7f7f7', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
       <form onSubmit={handleCall} style={{ background: '#fff', borderRadius: 10, boxShadow: '0 2px 16px #0001', padding: 28, width: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <h2 style={{ margin: 0, color: '#222', fontWeight: 600, fontSize: 22, letterSpacing: -1 }}>CallMate</h2>
+        <h2 style={{ margin: 0, color: '#222', fontWeight: 600, fontSize: 22, letterSpacing: -1 }}>Voxio</h2>
         <input
           type="tel"
           placeholder="Phone number"
@@ -126,6 +155,13 @@ function App() {
                 </div>
                 {call.call_id && (
                   <div style={{fontSize: 12, color: '#444', background: '#f5f5f5', borderRadius: 5, padding: 7, marginTop: 5, whiteSpace: 'pre-wrap', minHeight: 28}}>
+                    {/* Display audio player for recordings */}
+                    {recordingUrls[call.call_id] && (
+                      <div style={{marginBottom: 8}}>
+                        <audio src={recordingUrls[call.call_id]} controls style={{width: '100%', height: 30}} />
+                      </div>
+                    )}
+                    
                     {transcriptError[call.call_id] && (
                       <div style={{color: '#b00020', fontStyle: 'italic'}}>Transcript error: {transcriptError[call.call_id]}</div>
                     )}

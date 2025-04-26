@@ -211,6 +211,29 @@ def get_call_transcript(call_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting call transcript: {str(e)}")
 
+@app.get("/call_recording/{call_id}")
+def get_call_recording(call_id: str):
+    """Get call audio recording URL for a specific call"""
+    if not BLAND_API_KEY:
+        raise HTTPException(status_code=500, detail="BLAND_API_KEY not set in environment.")
+    
+    # Get recording URL from Bland.ai
+    bland_url = f"https://api.bland.ai/v1/calls/{call_id}/recording"
+    headers = {'Authorization': BLAND_API_KEY}
+    
+    try:
+        resp = requests.get(bland_url, headers=headers)
+        if not resp.ok:
+            raise HTTPException(status_code=resp.status_code, detail=f"Failed to get call recording: {resp.text}")
+        
+        data = resp.json()
+        if data.get("status") == "success" and data.get("url"):
+            return {"status": "success", "recording_url": data.get("url")}
+        else:
+            return {"status": "error", "message": "Recording not available"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting call recording: {str(e)}")
+
 # IMPORTANT: Mount static files AFTER defining all API routes
 # Serve React static files
 app.mount("/", StaticFiles(directory=frontend_build_dir, html=True), name="static")
