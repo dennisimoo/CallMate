@@ -48,7 +48,7 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem(CALLS_KEY, callsLeft);
-    localStorage.setItem(PHONE_KEY, phone);xio
+    localStorage.setItem(PHONE_KEY, phone);
   }, [callsLeft, phone]);
 
   // Update document title
