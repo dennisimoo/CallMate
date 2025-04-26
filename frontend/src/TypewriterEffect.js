@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const TypewriterEffect = ({ phrases, typingSpeed = 70, deletingSpeed = 40, pauseBetween = 1500, onComplete }) => {
+const TypewriterEffect = ({ phrases, typingSpeed = 50, deletingSpeed = 30, pauseBetween =2000, onComplete }) => {
   const [currentPhrase, setCurrentPhrase] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [phraseIndex, setPhraseIndex] = useState(0);
