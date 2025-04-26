@@ -1,5 +1,5 @@
 // Simple API utility for backend calls
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = 'http://localhost:8000';
 
 export async function triggerCall(phone_number, topic, options = {}) {
   try {
