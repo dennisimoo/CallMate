@@ -1,11 +1,11 @@
 // Simple API utility for backend calls
 const API_BASE = '';
 
-export async function triggerCall(phone_number, topic) {
+export async function triggerCall(phone_number, topic, options = {}) {
   const res = await fetch(`${API_BASE}/call`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone_number, topic }),
+    body: JSON.stringify({ phone_number, topic, ...options }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();

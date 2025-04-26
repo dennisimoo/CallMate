@@ -33,6 +33,7 @@ call_history: Dict[str, List[Dict[str, Any]]] = {}
 class CallRequest(BaseModel):
     phone_number: str
     topic: str
+    admin: Optional[bool] = False
 
 class CallRecord(BaseModel):
     topic: str
@@ -79,16 +80,22 @@ frontend_build_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "
 def trigger_call(req: CallRequest):
     if not BLAND_API_KEY:
         raise HTTPException(status_code=500, detail="BLAND_API_KEY not set in environment.")
-    # Moderate the call topic
-    if not moderate_call(req.topic):
-        return {"message": "Call topic rejected by moderation."}
+    
+    # Get admin flag from request body, if any
+    is_admin = req.admin
+    
+    # Skip moderation for admin users
+    if not is_admin:
+        # Moderate the call topic
+        if not moderate_call(req.topic):
+            return {"message": "Call topic rejected by moderation."}
     
     # Check call history for this phone number
     phone_history = call_history.get(req.phone_number, [])
     calls_made = len([call for call in phone_history if call.get("status") != "error"])
     
-    # Check if user has reached the call limit
-    if calls_made >= MAX_CALLS_PER_USER:
+    # Skip call limit check for admin users
+    if not is_admin and calls_made >= MAX_CALLS_PER_USER:
         return {"message": "Call limit reached", "calls_left": 0}
     
     # Actually trigger the call via Bland.ai
@@ -120,10 +127,13 @@ def trigger_call(req: CallRequest):
             
             call_history[req.phone_number].append(new_call)
             
+            # Calculate calls left (only matters for non-admin users)
+            calls_left = MAX_CALLS_PER_USER - calls_made - 1 if not is_admin else MAX_CALLS_PER_USER
+            
             return {
                 "message": "Bland.ai call triggered!", 
                 "call_id": call_id,
-                "calls_left": MAX_CALLS_PER_USER - calls_made - 1
+                "calls_left": calls_left
             }
         else:
             # Add failed call to history
@@ -179,15 +189,50 @@ def get_call_transcript(call_id: str):
     headers = {'Authorization': BLAND_API_KEY}
     
     try:
+        # First try to get regular transcript
         resp = requests.get(bland_url, headers=headers)
         if not resp.ok:
+            print(f"Error fetching transcript: {resp.status_code}, {resp.text}")
             raise HTTPException(status_code=resp.status_code, detail=f"Failed to get call transcript: {resp.text}")
         
         data = resp.json()
-        transcript = data.get("transcript", "")
         
-        # Process transcript data
-        # If transcript is available, parse it into an aligned format
+        # Try to get corrected transcript if available
+        try:
+            corrected_url = f"https://api.bland.ai/v1/calls/{call_id}/correct"
+            corrected_resp = requests.get(corrected_url, headers=headers)
+            if corrected_resp.ok:
+                corrected_data = corrected_resp.json()
+                if corrected_data.get("aligned") and len(corrected_data["aligned"]) > 0:
+                    print(f"Using corrected transcript for call {call_id}")
+                    # Use corrected transcripts if available
+                    return {
+                        "status": "success", 
+                        "aligned": corrected_data["aligned"],
+                        "is_corrected": True
+                    }
+        except Exception as corrected_err:
+            print(f"Error fetching corrected transcript: {str(corrected_err)}")
+            # Continue with regular transcript if corrected transcript fails
+            pass
+            
+        # Process regular transcript if corrected not available
+        transcript = data.get("transcript", "")
+        transcripts = data.get("transcripts", [])
+        
+        if transcripts and len(transcripts) > 0:
+            # Use transcripts array if available
+            aligned = []
+            for item in transcripts:
+                speaker = item.get("user", "unknown")
+                text = item.get("text", "")
+                if text and speaker:
+                    aligned.append({"speaker": speaker, "text": text})
+            
+            if aligned:
+                return {"status": "success", "transcript": transcript, "aligned": aligned}
+        
+        # Fallback: try to parse transcript string if transcripts array not available
         if transcript:
             try:
                 # Simple parsing of the transcript into user/agent segments
@@ -197,18 +242,46 @@ def get_call_transcript(call_id: str):
                 for line in lines:
                     if line.startswith("User:"):
                         aligned.append({"speaker": "user", "text": line[5:].strip()})
-                    elif line.startswith("Agent:"):
-                        aligned.append({"speaker": "agent", "text": line[6:].strip()})
+                    elif line.startswith("Agent:") or line.startswith("Assistant:"):
+                        prefix_len = 6 if line.startswith("Agent:") else 11
+                        aligned.append({"speaker": "assistant", "text": line[prefix_len:].strip()})
                     # Handle other formats or continue the previous speaker
                     elif aligned and line.strip():
                         aligned[-1]["text"] += " " + line.strip()
                 
-                return {"status": "success", "transcript": transcript, "aligned": aligned}
+                if aligned:
+                    return {"status": "success", "transcript": transcript, "aligned": aligned}
             except Exception as e:
+                print(f"Error processing transcript text: {str(e)}")
                 return {"status": "error", "message": f"Error processing transcript: {str(e)}"}
-        else:
-            return {"status": "pending", "message": "Transcript not available yet"}
+        
+        # If we have a concatenated transcript, try using that as a last resort
+        concat_transcript = data.get("concatenated_transcript", "")
+        if concat_transcript and not aligned:
+            try:
+                lines = concat_transcript.strip().split("\n")
+                aligned = []
+                
+                for line in lines:
+                    if line.startswith("user:"):
+                        aligned.append({"speaker": "user", "text": line[5:].strip()})
+                    elif line.startswith("assistant:"):
+                        aligned.append({"speaker": "assistant", "text": line[10:].strip()})
+                    elif aligned and line.strip():
+                        aligned[-1]["text"] += " " + line.strip()
+                
+                if aligned:
+                    return {"status": "success", "transcript": concat_transcript, "aligned": aligned}
+            except Exception as e:
+                print(f"Error processing concatenated transcript: {str(e)}")
+                
+        # Check if call is still in progress
+        if data.get("status") == "in-progress" or data.get("completed") is False:
+            return {"status": "pending", "message": "Call still in progress, transcript not available yet"}
+            
+        return {"status": "pending", "message": "Transcript not available yet"}
     except Exception as e:
+        print(f"Exception in call_transcript: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting call transcript: {str(e)}")
 
 @app.get("/call_recording/{call_id}")
