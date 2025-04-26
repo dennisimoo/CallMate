@@ -364,9 +364,9 @@ function App() {
             }}>
               <TypewriterEffect 
                 phrases={[conversationIdeas[0], conversationIdeas[8], conversationIdeas[16], conversationIdeas[24]]} 
-                typingSpeed={50} 
+                typingSpeed={20} 
                 deletingSpeed={30} 
-                pauseBetween={2000}
+                pauseBetween={8000}
               />
             </div>
             
