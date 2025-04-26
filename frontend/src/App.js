@@ -164,19 +164,19 @@ function App() {
       </div>
       
       <div style={{ fontSize: 14, color: '#555', marginBottom: 5, lineHeight: 1.4 }}>
-        Voxio will connect you to talk about anything you want. Just enter your phone number and we'll call you!
+        Voxio will connect a recipient to talk about anything you want. Just enter their phone number and a topic, and we'll call for you!
       </div>
       
       <input
         type="tel"
-        placeholder="Your phone number"
+        placeholder="Enter recipient's phone number"
         value={phone}
         onChange={e => setPhone(e.target.value)}
         style={{ padding: 10, fontSize: 16, borderRadius: 6, border: '1px solid #ddd' }}
         required
       />
       <textarea
-        placeholder="Describe your conversation topic"
+        placeholder="Describe your desired conversation topic"
         value={topic}
         onChange={e => setTopic(e.target.value)}
         style={{ padding: 10, fontSize: 16, borderRadius: 6, border: '1px solid #ddd', minHeight: 48, resize: 'vertical' }}
