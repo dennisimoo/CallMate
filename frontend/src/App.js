@@ -55,9 +55,10 @@ function App() {
   const [transcriptLoading, setTranscriptLoading] = useState({});
   const [transcriptError, setTranscriptError] = useState({});
   const [recordingUrls, setRecordingUrls] = useState({});
-  const [darkMode, setDarkMode] = useState(localStorage.getItem(THEME_KEY) === 'light' ? false : true);
+  const [darkMode, setDarkMode] = useState(localStorage.getItem(THEME_KEY) !== 'light');
   const [showLoader, setShowLoader] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
 
   // Sample conversation ideas - expanded list (30 total)
   const conversationIdeas = [
@@ -128,15 +129,14 @@ function App() {
     localStorage.setItem(ADMIN_KEY, isAdmin.toString());
   }, [callsLeft, phone, isAdmin]);
 
+  useEffect(() => {
+    localStorage.setItem(THEME_KEY, darkMode ? 'dark' : 'light');
+  }, [darkMode]);
+
   // Update document title
   useEffect(() => {
     document.title = "Plektu";
   }, []);
-
-  // Save theme preference to localStorage
-  useEffect(() => {
-    localStorage.setItem(THEME_KEY, darkMode ? 'dark' : 'light');
-  }, [darkMode]);
 
   // Auto-refresh transcript for successful calls
   useEffect(() => {
@@ -176,6 +176,14 @@ function App() {
     }, 3000); // every 3 seconds for more real-time feel
     return () => clearInterval(interval);
   }, [history, recordingUrls]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleCall = async (e) => {
     e.preventDefault();
@@ -244,43 +252,30 @@ function App() {
         borderRadius: 10, 
         boxShadow: darkMode ? '0 2px 16px rgba(0,0,0,0.3)' : '0 2px 16px rgba(0,0,0,0.1)', 
         padding: 28, 
-        width: 340, 
+        width: windowSize.width < 768 ? '90%' : 340, 
         display: 'flex', 
         flexDirection: 'column', 
-        gap: 16 
+        gap: 16
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <motion.h2 
-          initial={{ opacity: 0, x: -50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ 
-            duration: 1, 
-            ease: [0.2, 0.65, 0.3, 0.9],
-            type: "tween" 
-          }}
-          style={{ 
-            margin: 0, 
-            color: darkMode ? '#fff' : '#222', 
-            fontWeight: 600, 
-            fontSize: 22, 
-            letterSpacing: -1 
-          }}
-        >
-          Plektu
-        </motion.h2>
-        <motion.div 
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ 
-            duration: 1, 
-            ease: [0.2, 0.65, 0.3, 0.9]
-          }}
-          style={{ display: 'flex', alignItems: 'center' }}
-        >
-          <span style={{ fontSize: 14, color: darkMode ? '#ccc' : '#666' }}>by Dennis K. & Nicholas L.</span>
-        </motion.div>
-      </div>
+      <motion.h2 
+        initial={{ opacity: 0, x: -50 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ 
+          duration: 1, 
+          ease: [0.2, 0.65, 0.3, 0.9],
+          type: "tween" 
+        }}
+        style={{ 
+          margin: 0, 
+          color: darkMode ? '#fff' : '#222', 
+          fontWeight: 600, 
+          fontSize: 22, 
+          letterSpacing: -1 
+        }}
+      >
+        Plektu
+      </motion.h2>
       
       <motion.div 
         initial={{ opacity: 0 }}
@@ -324,7 +319,7 @@ function App() {
             fontSize: 16,
             fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             borderRadius: 8,
-            border: darkMode ? '1px solid #444' : '1px solid #ddd',
+            border: darkMode ? '1px solid #444' : '1px solid #ccc',
             backgroundColor: darkMode ? '#333' : '#fff',
             color: darkMode ? '#fff' : '#333',
             width: '100%',
@@ -355,10 +350,10 @@ function App() {
               padding: 10,
               fontSize: 14,
               fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
+              color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.6)',
               borderRadius: 8,
               maxWidth: 200,
-              backgroundColor: darkMode ? 'rgba(80,80,80,0.2)' : 'rgba(240,240,240,0.3)',
+              backgroundColor: darkMode ? 'rgba(80,80,80,0.2)' : 'rgba(220,220,220,0.6)',
               backdropFilter: 'blur(2px)',
               zIndex: 1
             }}>
@@ -378,10 +373,10 @@ function App() {
               padding: 10,
               fontSize: 14,
               fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
+              color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.6)',
               borderRadius: 8,
               maxWidth: 200,
-              backgroundColor: darkMode ? 'rgba(80,80,80,0.2)' : 'rgba(240,240,240,0.3)',
+              backgroundColor: darkMode ? 'rgba(80,80,80,0.2)' : 'rgba(220,220,220,0.6)',
               backdropFilter: 'blur(2px)',
               zIndex: 1
             }}>
@@ -401,10 +396,10 @@ function App() {
               padding: 10,
               fontSize: 14,
               fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
+              color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.6)',
               borderRadius: 8,
               maxWidth: 200,
-              backgroundColor: darkMode ? 'rgba(80,80,80,0.2)' : 'rgba(240,240,240,0.3)',
+              backgroundColor: darkMode ? 'rgba(80,80,80,0.2)' : 'rgba(220,220,220,0.6)',
               backdropFilter: 'blur(2px)',
               zIndex: 1
             }}>
@@ -424,10 +419,10 @@ function App() {
               padding: 10,
               fontSize: 14,
               fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
+              color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.6)',
               borderRadius: 8,
               maxWidth: 200,
-              backgroundColor: darkMode ? 'rgba(80,80,80,0.2)' : 'rgba(240,240,240,0.3)',
+              backgroundColor: darkMode ? 'rgba(80,80,80,0.2)' : 'rgba(220,220,220,0.6)',
               backdropFilter: 'blur(2px)',
               zIndex: 1
             }}>
@@ -447,10 +442,10 @@ function App() {
               padding: 10,
               fontSize: 14,
               fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
+              color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.6)',
               borderRadius: 8,
               maxWidth: 200,
-              backgroundColor: darkMode ? 'rgba(80,80,80,0.2)' : 'rgba(240,240,240,0.3)',
+              backgroundColor: darkMode ? 'rgba(80,80,80,0.2)' : 'rgba(220,220,220,0.6)',
               backdropFilter: 'blur(2px)',
               zIndex: 1
             }}>
@@ -470,10 +465,10 @@ function App() {
               padding: 10,
               fontSize: 14,
               fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
+              color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.6)',
               borderRadius: 8,
               maxWidth: 200,
-              backgroundColor: darkMode ? 'rgba(80,80,80,0.2)' : 'rgba(240,240,240,0.3)',
+              backgroundColor: darkMode ? 'rgba(80,80,80,0.2)' : 'rgba(220,220,220,0.6)',
               backdropFilter: 'blur(2px)',
               zIndex: 1
             }}>
@@ -493,10 +488,10 @@ function App() {
               padding: 10,
               fontSize: 14,
               fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
+              color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.6)',
               borderRadius: 8,
               maxWidth: 200,
-              backgroundColor: darkMode ? 'rgba(80,80,80,0.2)' : 'rgba(240,240,240,0.3)',
+              backgroundColor: darkMode ? 'rgba(80,80,80,0.2)' : 'rgba(220,220,220,0.6)',
               backdropFilter: 'blur(2px)',
               zIndex: 1
             }}>
@@ -516,10 +511,10 @@ function App() {
               padding: 10,
               fontSize: 14,
               fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              color: darkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
+              color: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.6)',
               borderRadius: 8,
               maxWidth: 200,
-              backgroundColor: darkMode ? 'rgba(80,80,80,0.2)' : 'rgba(240,240,240,0.3)',
+              backgroundColor: darkMode ? 'rgba(80,80,80,0.2)' : 'rgba(220,220,220,0.6)',
               backdropFilter: 'blur(2px)',
               zIndex: 1
             }}>
@@ -547,7 +542,7 @@ function App() {
             fontSize: 16,
             fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             borderRadius: 8,
-            border: darkMode ? '1px solid #444' : '1px solid #ddd',
+            border: darkMode ? '1px solid #444' : '1px solid #ccc',
             backgroundColor: darkMode ? '#333' : '#fff',
             color: darkMode ? '#fff' : '#333',
             minHeight: 48,
@@ -604,7 +599,7 @@ function App() {
             delay: 0.5,
             ease: "easeOut"
           }}
-          style={{ fontSize: 14, color: blue, textAlign: 'center' }}
+          style={{ fontSize: 14, color: darkMode ? '#8ee' : '#33a', textAlign: 'center' }}
         >
           Admin Mode - Unlimited Calls
           <motion.button 
@@ -777,10 +772,10 @@ function App() {
         borderRadius: 10, 
         boxShadow: darkMode ? '0 2px 16px rgba(0,0,0,0.3)' : '0 2px 16px rgba(0,0,0,0.1)', 
         padding: 28, 
-        width: 340, 
+        width: windowSize.width < 768 ? '90%' : 340, 
         display: 'flex', 
         flexDirection: 'column', 
-        gap: 16 
+        gap: 16
       }}
     >
       <motion.h2 
@@ -815,7 +810,7 @@ function App() {
             fontSize: 16,
             fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             borderRadius: 8,
-            border: darkMode ? '1px solid #444' : '1px solid #ddd',
+            border: darkMode ? '1px solid #444' : '1px solid #ccc',
             backgroundColor: darkMode ? '#333' : '#fff',
             color: darkMode ? '#fff' : '#333',
             width: '100%',
@@ -868,7 +863,8 @@ function App() {
       flexDirection: 'column', 
       justifyContent: 'center', 
       alignItems: 'center',
-      transition: 'background 0.5s ease'
+      transition: 'background 0.5s ease',
+      color: darkMode ? '#fff' : '#222'
     }}>
       {showLoader && (
         <div className="loader-container">
