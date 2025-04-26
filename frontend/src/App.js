@@ -164,34 +164,34 @@ function App() {
       </div>
       
       <div style={{ fontSize: 14, color: '#555', marginBottom: 5, lineHeight: 1.4 }}>
-        Voxio will connect you to talk about anything you want. Just enter your phone number and we'll call you!
+        Voxio will connect a recipient to talk about anything you want. Just enter their phone number and a topic, and we'll call for you!
       </div>
       
       <input
         type="tel"
-        placeholder="Your phone number"
+        placeholder="Enter recipient's phone number"
         value={phone}
         onChange={e => setPhone(e.target.value)}
         style={{ padding: 10, fontSize: 16, borderRadius: 6, border: '1px solid #ddd' }}
         required
       />
       <textarea
-        placeholder="Describe your conversation topic"
+        placeholder="Describe your desired conversation topic"
         value={topic}
         onChange={e => setTopic(e.target.value)}
         style={{ padding: 10, fontSize: 16, borderRadius: 6, border: '1px solid #ddd', minHeight: 48, resize: 'vertical' }}
         required
       />
       <button type="submit" disabled={loading || (!isAdmin && callsLeft === 0)} style={{ padding: 10, fontSize: 17, borderRadius: 6, border: 'none', background: '#222', color: '#fff', cursor: loading || (!isAdmin && callsLeft === 0) ? 'not-allowed' : 'pointer' }}>
-        {loading ? 'Calling...' : 'Call Me'}
+        {loading ? 'Calling...' : 'Call'}
       </button>
-      <div style={{ fontSize: 14, color: '#666', textAlign: 'center' }}>
+      <div style={{ fontSize: 20, color: '#666', textAlign: 'center' }}>
         {isAdmin ? (
           <div>
             Admin Mode - Unlimited Calls
             <button 
               onClick={handleLogout} 
-              style={{ marginLeft: 8, fontSize: 12, padding: '2px 6px', border: 'none', background: '#f0f0f0', borderRadius: 4, cursor: 'pointer' }}
+              style={{ marginLeft: 8, fontSize: 12, padding: '2px 6px', border: 'none', background: '#6495ED', borderRadius: 4, cursor: 'pointer' }}
             >
               Logout
             </button>
@@ -216,7 +216,7 @@ function App() {
           {status.replace('Bland.ai call triggered!', 'Call triggered!')}
           {status.includes('Call triggered') && (
             <div style={{marginTop: 5, fontSize: 13, fontWeight: 'normal'}}>
-              You'll receive a call shortly. Please answer your phone!
+              The number you chose will receive a call shortly. Please wait...
             </div>
           )}
         </div>
