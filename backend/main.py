@@ -308,5 +308,9 @@ def get_call_recording(call_id: str):
         raise HTTPException(status_code=500, detail=f"Error getting call recording: {str(e)}")
 
 # IMPORTANT: Mount static files AFTER defining all API routes
-# Serve React static files
-app.mount("/", StaticFiles(directory=frontend_build_dir, html=True), name="static")
+# Serve React static files only if the build directory exists (for production)
+if os.path.exists(frontend_build_dir):
+    app.mount("/", StaticFiles(directory=frontend_build_dir, html=True), name="static")
+else:
+    print("Frontend build directory not found - running in development mode without static files")
+    # In development mode, React app will be served separately by npm start
