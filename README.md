@@ -1,6 +1,6 @@
-# Voxio - AI Phone Call Assistant
+# Plektu - AI Phone Call Assistant
 
-Voxio is an application that connects users with intelligent AI assistants through phone calls. Built with React, FastAPI, and advanced AI technologies, it allows you to have natural conversations on any topic simply by entering your phone number.
+Plektu is an application that connects users with intelligent AI assistants through phone calls. Built with React, FastAPI, and advanced AI technologies, it allows you to have natural conversations on any topic simply by entering your phone number.
 
 ## ✨ Features
 
@@ -22,8 +22,8 @@ Voxio is an application that connects users with intelligent AI assistants throu
 
 **1. Clone the repository**
 ```bash
-git clone https://github.com/yourusername/voxio.git
-cd voxio
+git clone https://github.com/yourusername/Plektu.git
+cd Plektu
 ```
 
 **2. Set up environment variables**
@@ -84,7 +84,7 @@ To access the admin panel:
 ## 🛠️ Project Structure
 
 ```
-voxio/
+Plektu/
 ├── backend/             # FastAPI backend
 │   ├── main.py          # Main application file
 │   └── requirements.txt # Python dependencies
