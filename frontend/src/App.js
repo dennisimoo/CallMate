@@ -366,7 +366,7 @@ function App() {
                 phrases={[conversationIdeas[0], conversationIdeas[8], conversationIdeas[16], conversationIdeas[24]]} 
                 typingSpeed={20} 
                 deletingSpeed={30} 
-                pauseBetween={8000}
+                pauseBetween={15000}
               />
             </div>
             
