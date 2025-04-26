@@ -67,7 +67,7 @@ function App() {
 
   // Update document title
   useEffect(() => {
-    document.title = "Voxio by Dennis";
+    document.title = "Voxio by Dennis & Nicholas";
   }, []);
 
   // Auto-refresh transcript for successful calls
