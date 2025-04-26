@@ -604,7 +604,7 @@ function App() {
             delay: 0.5,
             ease: "easeOut"
           }}
-          style={{ fontSize: 14, color: darkMode ? '#ddd' : '#ADD8E6', textAlign: 'center' }}
+          style={{ fontSize: 14, color: blue ? '#ddd' : '#ADD8E6', textAlign: 'center' }}
         >
           Admin Mode - Unlimited Calls
           <motion.button 
