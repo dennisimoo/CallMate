@@ -48,7 +48,7 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem(CALLS_KEY, callsLeft);
-    localStorage.setItem(PHONE_KEY, phone);
+    localStorage.setItem(PHONE_KEY, phone);xio
   }, [callsLeft, phone]);
 
   // Update document title
@@ -121,7 +121,7 @@ function App() {
   return (
     <div style={{ minHeight: '100vh', background: '#f7f7f7', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
       <form onSubmit={handleCall} style={{ background: '#fff', borderRadius: 10, boxShadow: '0 2px 16px #0001', padding: 28, width: 340, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <h2 style={{ margin: 0, color: '#222', fontWeight: 600, fontSize: 22, letterSpacing: -1 }}>Voxio</h2>
+        <h2 style={{ margin: 0, color: '#222', fontWeight: 600, fontSize: 22, letterSpacing: -1 }}>Voxio by Dennis</h2>
         <input
           type="tel"
           placeholder="Phone number"
