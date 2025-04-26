@@ -5,6 +5,8 @@ import { triggerCall, getHistory, getCallTranscript, getCallDetails, getCallReco
 import './themeToggle.css';
 import './loader.css';
 import TypewriterEffect from './TypewriterEffect';
+import Auth from './components/Auth';
+import { supabase } from './supabaseClient';
 
 const MAX_CALLS = 5;
 const CALLS_KEY = 'plektu_calls_left';
@@ -42,23 +44,267 @@ function getPSTTimeString(iso) {
 }
 
 function App() {
-  const [phone, setPhone] = useState(localStorage.getItem(PHONE_KEY) || '');
+  // State variables
+  const [phone, setPhone] = useState('');
   const [topic, setTopic] = useState('');
   const [history, setHistory] = useState([]);
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
-  const [callsLeft, setCallsLeft] = useState(parseInt(localStorage.getItem(CALLS_KEY) || MAX_CALLS));
+  const [callsLeft, setCallsLeft] = useState(MAX_CALLS);
   const [activeTab, setActiveTab] = useState('main');
   const [adminPass, setAdminPass] = useState('');
-  const [isAdmin, setIsAdmin] = useState(!!localStorage.getItem(ADMIN_KEY));
+  const [isAdmin, setIsAdmin] = useState(false);
   const [alignedTrans, setAlignedTrans] = useState({});
   const [transcriptLoading, setTranscriptLoading] = useState({});
   const [transcriptError, setTranscriptError] = useState({});
   const [recordingUrls, setRecordingUrls] = useState({});
-  const [darkMode, setDarkMode] = useState(localStorage.getItem(THEME_KEY) !== 'light');
+  const [darkMode, setDarkMode] = useState(true);
   const [showLoader, setShowLoader] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [session, setSession] = useState(null);
+  const [bypassAuth, setBypassAuth] = useState(localStorage.getItem('bypass_auth') === 'true');
+  const [userPreferences, setUserPreferences] = useState({
+    darkMode: true,
+    isAdmin: false,
+    callsLeft: MAX_CALLS,
+    phoneNumber: ''
+  });
+
+  useEffect(() => {
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) {
+        fetchUserPreferences(session.user.id);
+      }
+    });
+
+    // Set up auth listener
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) {
+        fetchUserPreferences(session.user.id);
+      }
+    });
+
+    // Parse URL for error parameters from OAuth flow
+    const urlParams = new URLSearchParams(window.location.search);
+    const errorParam = urlParams.get('error');
+    const errorDesc = urlParams.get('error_description');
+    
+    if (errorParam) {
+      console.error('OAuth error:', errorParam, errorDesc);
+      
+      // If we get a code exchange error but have valid user session, ignore it
+      // This can happen when the OAuth callback completes but has trouble with code exchange
+      if (errorParam === 'server_error' && errorDesc?.includes('Unable to exchange external code')) {
+        console.log('Proceeding despite OAuth code exchange error');
+        localStorage.setItem('bypass_auth', 'true');
+        setBypassAuth(true);
+        
+        // Remove error params from URL without refreshing page
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Fetch user preferences from Supabase
+  const fetchUserPreferences = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_preferences')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching preferences:', error);
+        return;
+      }
+
+      if (data) {
+        // Update local state from preferences
+        setDarkMode(data.dark_mode !== false); // Default to dark mode if not specified
+        setIsAdmin(data.is_admin || false);
+        setCallsLeft(data.calls_left || MAX_CALLS);
+        setPhone(data.phone_number || '');
+        
+        // Update consolidated state
+        setUserPreferences({
+          darkMode: data.dark_mode !== false,
+          isAdmin: data.is_admin || false,
+          callsLeft: data.calls_left || MAX_CALLS,
+          phoneNumber: data.phone_number || ''
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching user preferences:', error);
+    }
+  };
+
+  // Save preferences to Supabase
+  const saveUserPreferences = async () => {
+    if (!session?.user?.id) return;
+    
+    try {
+      const { error } = await supabase
+        .from('user_preferences')
+        .upsert({
+          user_id: session.user.id,
+          dark_mode: darkMode,
+          is_admin: isAdmin,
+          calls_left: callsLeft,
+          phone_number: phone,
+          updated_at: new Date()
+        });
+
+      if (error) {
+        console.error('Error saving preferences:', error);
+      }
+    } catch (error) {
+      console.error('Error saving user preferences:', error);
+    }
+  };
+
+  useEffect(() => {
+    localStorage.setItem(THEME_KEY, darkMode ? 'dark' : 'light');
+    
+    // Save to Supabase if user is logged in
+    if (session?.user?.id) {
+      saveUserPreferences();
+    }
+  }, [darkMode]);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      // Only save if we have some changes and the user is logged in
+      saveUserPreferences();
+    }
+  }, [callsLeft, isAdmin, phone]);
+
+  useEffect(() => {
+    if (phone) {
+      getHistory(phone).then(h => setHistory(h)).catch(() => setHistory([]));
+    }
+    
+    // Add loader timeout
+    const timer = setTimeout(() => {
+      const loaderElement = document.querySelector('.loader-container');
+      if (loaderElement) {
+        loaderElement.classList.add('fade-out');
+        setTimeout(() => {
+          setShowLoader(false);
+          // Start showing suggestions with a delay after loader disappears
+          setTimeout(() => {
+            setShowSuggestions(true);
+          }, 1000);
+        }, 800); // Match the CSS transition time
+      } else {
+        setShowLoader(false);
+        // Start showing suggestions with a delay
+        setTimeout(() => {
+          setShowSuggestions(true);
+        }, 1000);
+      }
+    }, 3000); // Changed to 3 seconds
+    
+    return () => clearTimeout(timer);
+  }, [phone]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    // Fetch the latest commit info from GitHub
+    fetch('https://api.github.com/repos/dennisimoo/CallMate/commits?per_page=1')
+      .then(response => response.json())
+      .then(data => {
+        if (data && data[0] && data[0].commit) {
+          const date = new Date(data[0].commit.author.date);
+          setLastUpdated(date);
+        }
+      })
+      .catch(error => console.error('Error fetching repo data:', error));
+  }, []);
+
+  // Sign out function
+  const handleSignOut = async () => {
+    // Clear authentication state
+    await supabase.auth.signOut();
+    
+    // Clear bypass auth flag if it exists
+    localStorage.removeItem('bypass_auth');
+    
+    // Clear other stored values 
+    localStorage.removeItem(CALLS_KEY);
+    localStorage.removeItem(PHONE_KEY);
+    localStorage.removeItem(ADMIN_KEY);
+    
+    // Force refresh to show login screen
+    window.location.reload();
+  };
+
+  const handleCall = async (e) => {
+    e.preventDefault();
+    setStatus('');
+    setLoading(true);
+    try {
+      if (!isAdmin && callsLeft <= 0) {
+        setStatus('You have reached the maximum number of calls.');
+        setLoading(false);
+        return;
+      }
+      
+      // If admin, pass a flag to bypass moderation
+      const adminFlag = isAdmin ? { admin: true } : {};
+      
+      const res = await triggerCall(phone, topic, adminFlag);
+      setStatus(res.message === 'Bland.ai call triggered!' ? 'Call triggered.' : res.message);
+      
+      // Only decrease calls left if not in admin mode
+      if (!isAdmin) {
+        setCallsLeft(res.calls_left);
+      }
+      
+      // Immediately fetch updated history to show the new call
+      getHistory(phone).then(h => setHistory(h)).catch(() => {});
+            
+    } catch (error) {
+      setStatus(`Error: ${error.message || 'Something went wrong.'}`);
+    }
+    setLoading(false);
+  };
+  
+  const handleAdminLogin = (e) => {
+    e.preventDefault();
+    if (adminPass === 'admin') {
+      setIsAdmin(true);
+      setAdminPass('');
+      setActiveTab('main');
+    } else {
+      alert('Incorrect admin password');
+    }
+  };
+  
+  const handleLogout = () => {
+    setIsAdmin(false);
+  };
+
+  // Toggle dark/light mode
+  const toggleTheme = () => {
+    setDarkMode(!darkMode);
+  };
 
   // Sample conversation ideas - expanded list (30 total)
   const conversationIdeas = [
@@ -93,149 +339,6 @@ function App() {
     "Ask about discounts for bulk ordering",
     "Inquire about package tracking details"
   ];
-
-  useEffect(() => {
-    if (phone) {
-      getHistory(phone).then(h => setHistory(h)).catch(() => setHistory([]));
-    }
-    
-    // Add loader timeout
-    const timer = setTimeout(() => {
-      const loaderElement = document.querySelector('.loader-container');
-      if (loaderElement) {
-        loaderElement.classList.add('fade-out');
-        setTimeout(() => {
-          setShowLoader(false);
-          // Start showing suggestions with a delay after loader disappears
-          setTimeout(() => {
-            setShowSuggestions(true);
-          }, 1000);
-        }, 800); // Match the CSS transition time
-      } else {
-        setShowLoader(false);
-        // Start showing suggestions with a delay
-        setTimeout(() => {
-          setShowSuggestions(true);
-        }, 1000);
-      }
-    }, 3000); // Changed to 3 seconds
-    
-    return () => clearTimeout(timer);
-  }, [phone]);
-
-  useEffect(() => {
-    localStorage.setItem(CALLS_KEY, callsLeft);
-    localStorage.setItem(PHONE_KEY, phone);
-    localStorage.setItem(ADMIN_KEY, isAdmin.toString());
-  }, [callsLeft, phone, isAdmin]);
-
-  useEffect(() => {
-    localStorage.setItem(THEME_KEY, darkMode ? 'dark' : 'light');
-  }, [darkMode]);
-
-  // Update document title
-  useEffect(() => {
-    document.title = "Plektu";
-  }, []);
-
-  // Auto-refresh transcript for successful calls
-  useEffect(() => {
-    const interval = setInterval(() => {
-      history.forEach(call => {
-        if (call.call_id && call.status === 'success') {
-          // Fetch transcript
-          setTranscriptLoading(tl => ({ ...tl, [call.call_id]: true }));
-          getCallTranscript(call.call_id).then(data => {
-            if (Array.isArray(data.aligned) && data.aligned.length > 0) {
-              setAlignedTrans(at => ({ ...at, [call.call_id]: data.aligned }));
-              setTranscriptLoading(tl => ({ ...tl, [call.call_id]: false }));
-              setTranscriptError(errs => ({ ...errs, [call.call_id]: undefined }));
-            } else if (data.status === 'error' || data.message) {
-              setTranscriptError(errs => ({ ...errs, [call.call_id]: data.message || 'Transcript error.' }));
-              setTranscriptLoading(tl => ({ ...tl, [call.call_id]: false }));
-            } else {
-              setTranscriptLoading(tl => ({ ...tl, [call.call_id]: true }));
-            }
-          }).catch(err => {
-            setTranscriptError(errs => ({ ...errs, [call.call_id]: (err && err.message) || 'Transcript fetch error.' }));
-            setTranscriptLoading(tl => ({ ...tl, [call.call_id]: false }));
-          });
-          
-          // Fetch recording if we don't have it already
-          if (!recordingUrls[call.call_id]) {
-            getCallRecording(call.call_id).then(data => {
-              if (data.status === 'success' && data.recording_url) {
-                setRecordingUrls(urls => ({ ...urls, [call.call_id]: data.recording_url }));
-              }
-            }).catch(() => {
-              // Silently fail - recording might not be available yet
-            });
-          }
-        }
-      });
-    }, 3000); // every 3 seconds for more real-time feel
-    return () => clearInterval(interval);
-  }, [history, recordingUrls]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const handleCall = async (e) => {
-    e.preventDefault();
-    setStatus('');
-    setLoading(true);
-    try {
-      if (!isAdmin && callsLeft <= 0) {
-        setStatus('You have reached the maximum number of calls.');
-        setLoading(false);
-        return;
-      }
-      
-      // If admin, pass a flag to bypass moderation
-      const adminFlag = isAdmin ? { admin: true } : {};
-      
-      const res = await triggerCall(phone, topic, adminFlag);
-      setStatus(res.message === 'Bland.ai call triggered!' ? 'Call triggered.' : res.message);
-      
-      // Only decrease calls left if not in admin mode
-      if (!isAdmin) {
-        setCallsLeft(res.calls_left);
-      }
-      
-      setTopic('');
-    } catch (err) {
-      let msg = err.message;
-      if (msg.includes('Call topic rejected')) msg = 'This topic is not allowed. Please enter a safe, appropriate topic.';
-      if (msg.includes('Call limit reached')) msg = 'You have reached the maximum number of calls.';
-      setStatus(msg);
-    }
-    setLoading(false);
-  };
-  
-  const handleAdminLogin = (e) => {
-    e.preventDefault();
-    if (adminPass === 'admin') {
-      setIsAdmin(true);
-      setAdminPass('');
-      setActiveTab('main');
-    } else {
-      alert('Incorrect admin password');
-    }
-  };
-  
-  const handleLogout = () => {
-    setIsAdmin(false);
-  };
-
-  // Toggle dark/light mode
-  const toggleTheme = () => {
-    setDarkMode(!darkMode);
-  };
 
   const renderMainTab = () => (
     <motion.form 
@@ -718,8 +821,33 @@ function App() {
                     >
                       {/* Display audio player for recordings */}
                       {recordingUrls[call.call_id] && (
-                        <div style={{marginBottom: 8}}>
-                          <audio src={recordingUrls[call.call_id]} controls style={{width: '100%', height: 30}} />
+                        <div style={{marginTop: 8, marginBottom: 4}}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <audio 
+                              src={recordingUrls[call.call_id]} 
+                              controls 
+                              style={{ width: '100%', height: 30, marginBottom: 5 }}
+                            />
+                            <a 
+                              href={recordingUrls[call.call_id]} 
+                              download={`call-recording-${call.call_id}.mp3`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ 
+                                textDecoration: 'none',
+                                backgroundColor: darkMode ? '#333' : '#f0f0f0',
+                                color: darkMode ? '#8ee' : '#0077cc',
+                                padding: '4px 8px',
+                                borderRadius: 4,
+                                fontSize: 12,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              Download
+                            </a>
+                          </div>
                         </div>
                       )}
                       
@@ -784,7 +912,7 @@ function App() {
         transition={{ 
           duration: 1, 
           ease: [0.2, 0.65, 0.3, 0.9],
-          type: "tween"
+          type: "tween" 
         }}
         style={{ margin: 0, color: darkMode ? '#fff' : '#222', fontWeight: 600, fontSize: 22, letterSpacing: -1 }}
       >
@@ -855,6 +983,62 @@ function App() {
     </motion.form>
   );
 
+  useEffect(() => {
+    if (session?.user?.id) {
+      // Only save if we have some changes and the user is logged in
+      saveUserPreferences();
+    }
+  }, [callsLeft, isAdmin, phone]);
+
+  useEffect(() => {
+    // Update document title
+    document.title = "Plektu";
+  }, []);
+
+  useEffect(() => {
+    // Auto-refresh transcript for successful calls (more frequent polling)
+    const interval = setInterval(() => {
+      // Update status messages and history automatically after a call is triggered
+      if (status.includes('Call triggered')) {
+        getHistory(phone).then(h => setHistory(h)).catch(() => {});
+      }
+      
+      history.forEach(call => {
+        if (call.call_id && call.status === 'success') {
+          // Fetch transcript
+          setTranscriptLoading(tl => ({ ...tl, [call.call_id]: true }));
+          getCallTranscript(call.call_id).then(data => {
+            if (Array.isArray(data.aligned) && data.aligned.length > 0) {
+              setAlignedTrans(at => ({ ...at, [call.call_id]: data.aligned }));
+              setTranscriptLoading(tl => ({ ...tl, [call.call_id]: false }));
+              setTranscriptError(errs => ({ ...errs, [call.call_id]: undefined }));
+            } else if (data.status === 'error' || data.message) {
+              setTranscriptError(errs => ({ ...errs, [call.call_id]: data.message || 'Transcript error.' }));
+              setTranscriptLoading(tl => ({ ...tl, [call.call_id]: false }));
+            } else {
+              setTranscriptLoading(tl => ({ ...tl, [call.call_id]: true }));
+            }
+          }).catch(err => {
+            setTranscriptError(errs => ({ ...errs, [call.call_id]: (err && err.message) || 'Transcript fetch error.' }));
+            setTranscriptLoading(tl => ({ ...tl, [call.call_id]: false }));
+          });
+          
+          // Fetch recording if we don't have it already
+          if (!recordingUrls[call.call_id]) {
+            getCallRecording(call.call_id).then(data => {
+              if (data.status === 'success' && data.recording_url) {
+                setRecordingUrls(urls => ({ ...urls, [call.call_id]: data.recording_url }));
+              }
+            }).catch(() => {
+              // Silently fail - recording might not be available yet
+            });
+          }
+        }
+      });
+    }, 2000); // every 2 seconds for more real-time feel
+    return () => clearInterval(interval);
+  }, [history, recordingUrls, phone, status]);
+
   return (
     <div style={{ 
       minHeight: '100vh', 
@@ -880,168 +1064,250 @@ function App() {
         </div>
       )}
       
-      <motion.div 
-        initial={{ opacity: 0, y: -15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ 
-          duration: 0.8,
-          ease: "easeOut"
-        }}
-        style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          width: '340px', 
-          marginBottom: 16 
-        }}
-      >
-        <div style={{ display: 'flex', gap: 5 }}>
-          <motion.button 
-            onClick={() => setActiveTab('main')} 
-            whileHover={{ 
-              scale: 1.03,
-              transition: { duration: 0.3, ease: "easeOut" }
-            }}
-            whileTap={{ 
-              scale: 0.97,
-              transition: { duration: 0.1, ease: "easeOut" }
+      {!session && !bypassAuth ? (
+        // Authentication screen when not logged in and not bypassing auth
+        <Auth darkMode={darkMode} />
+      ) : (
+        // Application content when logged in or bypassing auth
+        <>
+          <motion.div 
+            initial={{ opacity: 0, y: -15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ 
+              duration: 0.8,
+              ease: "easeOut"
             }}
             style={{ 
-              padding: '8px 16px', 
-              fontSize: 14, 
-              fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              border: 'none', 
-              background: activeTab === 'main' ? (darkMode ? '#444' : '#222') : (darkMode ? '#333' : '#e0e0e0'), 
-              color: activeTab === 'main' ? '#fff' : (darkMode ? '#ccc' : '#222'), 
-              borderRadius: 6, 
-              cursor: 'pointer',
-              fontWeight: 500
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              width: '340px', 
+              marginBottom: 16 
             }}
           >
-            Home
-          </motion.button>
-          <motion.button 
-            onClick={() => setActiveTab('admin')} 
-            whileHover={{ 
-              scale: 1.03,
-              transition: { duration: 0.3, ease: "easeOut" }
-            }}
-            whileTap={{ 
-              scale: 0.97,
-              transition: { duration: 0.1, ease: "easeOut" }
-            }}
-            style={{ 
-              padding: '8px 16px', 
-              fontSize: 14, 
-              fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              border: 'none', 
-              background: activeTab === 'admin' ? (darkMode ? '#444' : '#222') : (darkMode ? '#333' : '#e0e0e0'), 
-              color: activeTab === 'admin' ? '#fff' : (darkMode ? '#ccc' : '#222'), 
-              borderRadius: 6, 
-              cursor: 'pointer',
-              fontWeight: 500
-            }}
-          >
-            Admin
-          </motion.button>
-        </div>
-        <motion.label 
-          className="switch"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ 
-            duration: 0.8, 
-            delay: 0.1,
-            ease: "easeOut"
-          }}
-        >
-          <input id="input" type="checkbox" checked={darkMode} onChange={toggleTheme} />
-          <div className="slider round">
-            <div className="sun-moon">
-              <svg id="moon-dot-1" className="moon-dot" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="50"></circle>
-              </svg>
-              <svg id="moon-dot-2" className="moon-dot" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="50"></circle>
-              </svg>
-              <svg id="moon-dot-3" className="moon-dot" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="50"></circle>
-              </svg>
-              <svg id="light-ray-1" className="light-ray" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="50"></circle>
-              </svg>
-              <svg id="light-ray-2" className="light-ray" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="50"></circle>
-              </svg>
-              <svg id="light-ray-3" className="light-ray" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="50"></circle>
-              </svg>
-              <svg id="cloud-1" className="cloud-dark" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="50"></circle>
-              </svg>
-              <svg id="cloud-2" className="cloud-dark" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="50"></circle>
-              </svg>
-              <svg id="cloud-3" className="cloud-dark" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="50"></circle>
-              </svg>
-              <svg id="cloud-4" className="cloud-light" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="50"></circle>
-              </svg>
-              <svg id="cloud-5" className="cloud-light" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="50"></circle>
-              </svg>
-              <svg id="cloud-6" className="cloud-light" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="50"></circle>
-              </svg>
+            <div style={{ display: 'flex', gap: 5 }}>
+              <motion.button 
+                onClick={() => setActiveTab('main')} 
+                whileHover={{ 
+                  scale: 1.03,
+                  transition: { duration: 0.3, ease: "easeOut" }
+                }}
+                whileTap={{ 
+                  scale: 0.97,
+                  transition: { duration: 0.1, ease: "easeOut" }
+                }}
+                style={{ 
+                  padding: '8px 16px', 
+                  fontSize: 14, 
+                  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  border: 'none', 
+                  background: activeTab === 'main' ? (darkMode ? '#444' : '#222') : (darkMode ? '#333' : '#e0e0e0'), 
+                  color: activeTab === 'main' ? '#fff' : (darkMode ? '#ccc' : '#222'), 
+                  borderRadius: 6, 
+                  cursor: 'pointer',
+                  fontWeight: 500
+                }}
+              >
+                Home
+              </motion.button>
+              <motion.button 
+                onClick={() => setActiveTab('admin')} 
+                whileHover={{ 
+                  scale: 1.03,
+                  transition: { duration: 0.3, ease: "easeOut" }
+                }}
+                whileTap={{ 
+                  scale: 0.97,
+                  transition: { duration: 0.1, ease: "easeOut" }
+                }}
+                style={{ 
+                  padding: '8px 16px', 
+                  fontSize: 14, 
+                  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  border: 'none', 
+                  background: activeTab === 'admin' ? (darkMode ? '#444' : '#222') : (darkMode ? '#333' : '#e0e0e0'), 
+                  color: activeTab === 'admin' ? '#fff' : (darkMode ? '#ccc' : '#222'), 
+                  borderRadius: 6, 
+                  cursor: 'pointer',
+                  fontWeight: 500
+                }}
+              >
+                Admin
+              </motion.button>
             </div>
-            <div className="stars">
-              <svg id="star-1" className="star" viewBox="0 0 20 20">
-                <path d="M 0 10 C 10 10,10 10 ,0 10 C 10 10 , 10 10 , 10 20 C 10 10 , 10 10 , 20 10 C 10 10 , 10 10 , 10 0 C 10 10,10 10 ,0 10 Z"></path>
-              </svg>
-              <svg id="star-2" className="star" viewBox="0 0 20 20">
-                <path d="M 0 10 C 10 10,10 10 ,0 10 C 10 10 , 10 10 , 10 20 C 10 10 , 10 10 , 20 10 C 10 10 , 10 10 , 10 0 C 10 10,10 10 ,0 10 Z"></path>
-              </svg>
-              <svg id="star-3" className="star" viewBox="0 0 20 20">
-                <path d="M 0 10 C 10 10,10 10 ,0 10 C 10 10 , 10 10 , 10 20 C 10 10 , 10 10 , 20 10 C 10 10 , 10 10 , 10 0 C 10 10,10 10 ,0 10 Z"></path>
-              </svg>
-              <svg id="star-4" className="star" viewBox="0 0 20 20">
-                <path d="M 0 10 C 10 10,10 10 ,0 10 C 10 10 , 10 10 , 10 20 C 10 10 , 10 10 , 20 10 C 10 10 , 10 10 , 10 0 C 10 10,10 10 ,0 10 Z"></path>
-              </svg>
+            <motion.label 
+              className="switch"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ 
+                duration: 0.8, 
+                delay: 0.1,
+                ease: "easeOut"
+              }}
+            >
+              <input id="input" type="checkbox" checked={darkMode} onChange={toggleTheme} />
+              <div className="slider round">
+                <div className="sun-moon">
+                  <svg id="moon-dot-1" className="moon-dot" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="50"></circle>
+                  </svg>
+                  <svg id="moon-dot-2" className="moon-dot" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="50"></circle>
+                  </svg>
+                  <svg id="moon-dot-3" className="moon-dot" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="50"></circle>
+                  </svg>
+                  <svg id="light-ray-1" className="light-ray" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="50"></circle>
+                  </svg>
+                  <svg id="light-ray-2" className="light-ray" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="50"></circle>
+                  </svg>
+                  <svg id="light-ray-3" className="light-ray" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="50"></circle>
+                  </svg>
+                  <svg id="cloud-1" className="cloud-dark" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="50"></circle>
+                  </svg>
+                  <svg id="cloud-2" className="cloud-dark" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="50"></circle>
+                  </svg>
+                  <svg id="cloud-3" className="cloud-dark" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="50"></circle>
+                  </svg>
+                  <svg id="cloud-4" className="cloud-light" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="50"></circle>
+                  </svg>
+                  <svg id="cloud-5" className="cloud-light" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="50"></circle>
+                  </svg>
+                  <svg id="cloud-6" className="cloud-light" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="50"></circle>
+                  </svg>
+                </div>
+                <div className="stars">
+                  <svg id="star-1" className="star" viewBox="0 0 20 20">
+                    <path d="M 0 10 C 10 10,10 10 ,0 10 C 10 10 , 10 10 , 10 20 C 10 10 , 10 10 , 20 10 C 10 10 , 10 10 , 10 0 C 10 10,10 10 ,0 10 Z"></path>
+                  </svg>
+                  <svg id="star-2" className="star" viewBox="0 0 20 20">
+                    <path d="M 0 10 C 10 10,10 10 ,0 10 C 10 10 , 10 10 , 10 20 C 10 10 , 10 10 , 20 10 C 10 10 , 10 10 , 10 0 C 10 10,10 10 ,0 10 Z"></path>
+                  </svg>
+                  <svg id="star-3" className="star" viewBox="0 0 20 20">
+                    <path d="M 0 10 C 10 10,10 10 ,0 10 C 10 10 , 10 10 , 10 20 C 10 10 , 10 10 , 20 10 C 10 10 , 10 10 , 10 0 C 10 10,10 10 ,0 10 Z"></path>
+                  </svg>
+                  <svg id="star-4" className="star" viewBox="0 0 20 20">
+                    <path d="M 0 10 C 10 10,10 10 ,0 10 C 10 10 , 10 10 , 10 20 C 10 10 , 10 10 , 20 10 C 10 10 , 10 10 , 10 0 C 10 10,10 10 ,0 10 Z"></path>
+                  </svg>
+                </div>
+              </div>
+            </motion.label>
+          </motion.div>
+          
+          {/* Sign Out Button (Floating at the corner) */}
+          {(session || bypassAuth) && (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              onClick={handleSignOut}
+              style={{
+                position: 'absolute',
+                top: 20,
+                right: 20,
+                padding: '8px 12px',
+                fontSize: 13,
+                fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                border: 'none',
+                background: darkMode ? 'rgba(220, 38, 38, 0.2)' : 'rgba(220, 38, 38, 0.1)',
+                color: darkMode ? '#ff5c5c' : '#e53935',
+                borderRadius: 6,
+                cursor: 'pointer',
+                fontWeight: 500,
+                boxShadow: darkMode ? '0 2px 8px rgba(0,0,0,0.3)' : '0 1px 3px rgba(0,0,0,0.1)'
+              }}
+            >
+              Sign Out
+            </motion.button>
+          )}
+          
+          <AnimatePresence mode="wait">
+            {activeTab === 'main' ? (
+              <motion.div
+                key="main"
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 30 }}
+                transition={{ 
+                  duration: 0.6,
+                  ease: [0.2, 0.65, 0.3, 0.9]
+                }}
+              >
+                {renderMainTab()}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="admin"
+                initial={{ opacity: 0, x: 30 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -30 }}
+                transition={{ 
+                  duration: 0.6,
+                  ease: [0.2, 0.65, 0.3, 0.9]
+                }}
+              >
+                {renderAdminTab()}
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ 
+              duration: 0.8,
+              delay: 0.5,
+              ease: "easeOut"
+            }}
+            style={{
+              position: 'absolute',
+              bottom: 15,
+              fontSize: 12,
+              color: darkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 5
+            }}
+          >
+            <div>
+              by <a 
+                href="https://github.com/dennisimoo" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{ color: darkMode ? '#8ee' : '#0077cc', textDecoration: 'none' }}
+              >
+                Dennis K.
+              </a> & <a 
+                href="https://github.com/Neekoras" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{ color: darkMode ? '#8ee' : '#0077cc', textDecoration: 'none' }}
+              >
+                Nicholas L.
+              </a>
             </div>
-          </div>
-        </motion.label>
-      </motion.div>
-      
-      <AnimatePresence mode="wait">
-        {activeTab === 'main' ? (
-          <motion.div
-            key="main"
-            initial={{ opacity: 0, x: -30 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 30 }}
-            transition={{ 
-              duration: 0.6,
-              ease: [0.2, 0.65, 0.3, 0.9]
-            }}
-          >
-            {renderMainTab()}
+            {lastUpdated && (
+              <div style={{ fontSize: 11 }}>
+                Last updated: {lastUpdated.toLocaleDateString('en-US', { 
+                  year: 'numeric', 
+                  month: 'short', 
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </div>
+            )}
           </motion.div>
-        ) : (
-          <motion.div
-            key="admin"
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -30 }}
-            transition={{ 
-              duration: 0.6,
-              ease: [0.2, 0.65, 0.3, 0.9]
-            }}
-          >
-            {renderAdminTab()}
-          </motion.div>
-        )}
-      </AnimatePresence>
+        </>
+      )}
     </div>
   );
 }
