@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef } from 'react';
  * - Types one phrase at a time, looping through suggestions.
  * - Supports dark and light mode for cursor and text.
  */
-const TypewriterEffect = ({ phrases, darkMode }) => {
+const TypewriterEffect = ({ phrases, darkMode, typingSpeed = 50, deletingSpeed = 30, pauseBetween = 2000, onComplete }) => {
   const [index, setIndex] = useState(0);
   const [displayed, setDisplayed] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
@@ -24,23 +24,26 @@ const TypewriterEffect = ({ phrases, darkMode }) => {
     if (!isDeleting && displayed.length < phrase.length) {
       timerRef.current = setTimeout(() => {
         setDisplayed(phrase.slice(0, displayed.length + 1));
-      }, 55 + Math.random() * 40);
+      }, typingSpeed + Math.random() * 40);
     } else if (!isDeleting && displayed.length === phrase.length) {
-      timerRef.current = setTimeout(() => setIsDeleting(true), 1700);
+      timerRef.current = setTimeout(() => setIsDeleting(true), pauseBetween);
     } else if (isDeleting && displayed.length > 0) {
       timerRef.current = setTimeout(() => {
         setDisplayed(displayed.slice(0, -1));
-      }, 28 + Math.random() * 25);
+      }, deletingSpeed + Math.random() * 25);
     } else if (isDeleting && displayed.length === 0) {
       setTransitioning(true);
       timerRef.current = setTimeout(() => {
         setIndex((i) => (i + 1) % phrases.length);
         setIsDeleting(false);
         setTransitioning(false);
+        if (onComplete && index === phrases.length - 1) {
+          onComplete();
+        }
       }, 320);
     }
     return () => clearTimeout(timerRef.current);
-  }, [displayed, isDeleting, index, phrases]);
+  }, [displayed, isDeleting, index, phrases, typingSpeed, deletingSpeed, pauseBetween, onComplete]);
 
   // Blinking cursor
   useEffect(() => {
