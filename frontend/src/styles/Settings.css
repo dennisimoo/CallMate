@@ -1,0 +1,184 @@
+/* Settings Component Styling */
+.settings-container {
+  position: relative;
+}
+
+.btn-cont {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: auto;
+  background-color: transparent;
+  margin: 0;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border-radius: 0;
+  transition: all 0.2s ease;
+}
+
+.button {
+  background: none;
+  border: none !important;
+  outline: none !important;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 0;
+  position: relative;
+  transition: background-color 0.2s ease;
+  box-shadow: none !important;
+}
+
+.button:hover .tooltip {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+.settings-btn {
+  display: block;
+  transition: transform 0.4s ease-in;
+}
+
+.settings-btn:hover {
+  transform: rotate(60deg);
+}
+
+.settings-btn:active {
+  animation: rot 1s linear infinite;
+}
+
+@keyframes rot {
+  from {
+    transform: rotate(-100deg);
+  }
+  to {
+    transform: rotate(180deg);
+  }
+}
+
+/* Hide tooltip completely */
+.tooltip {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* Settings Panel */
+.settings-panel {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  width: 280px;
+  padding: 20px;
+  border-radius: 12px;
+  z-index: 100;
+}
+
+.settings-panel h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.settings-section {
+  margin-bottom: 20px;
+}
+
+.settings-section h4 {
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.theme-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Switch styling */
+.switch-container {
+  position: relative;
+  width: 40px;
+  height: 20px;
+}
+
+.switch-container input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-container label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: .4s;
+}
+
+.switch-container label:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  border-radius: 50%;
+  transition: .4s;
+}
+
+.switch-container input:checked + label {
+  background-color: #2196F3;
+}
+
+.switch-container input:checked + label:before {
+  transform: translateX(20px);
+}
+
+/* Color options */
+.color-options {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.color-option {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  transition: transform 0.2s;
+  border: 2px solid transparent;
+}
+
+.color-option:hover {
+  transform: scale(1.1);
+  border: 2px solid #2196F3;
+}
+
+.close-button {
+  width: 100%;
+  padding: 8px;
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+  margin-top: 10px;
+  transition: background-color 0.2s;
+}
+
+.close-button:hover {
+  background-color: #0d8bf2;
+}

@@ -157,4 +157,5 @@
 .fade-out {
   opacity: 0;
   visibility: hidden;
+  transition: opacity 0.8s ease-out, visibility 0.8s ease-out;
 }

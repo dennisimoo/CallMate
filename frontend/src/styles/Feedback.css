@@ -1,0 +1,106 @@
+/* Feedback Component Styling */
+.feedback-container {
+  position: relative;
+}
+
+.feedback-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.feedback-button:hover {
+  filter: brightness(1.1);
+}
+
+/* Feedback Panel */
+.feedback-panel {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  width: 300px;
+  padding: 20px;
+  border-radius: 12px;
+  z-index: 100;
+}
+
+.feedback-panel h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.feedback-panel textarea {
+  width: 100%;
+  resize: none;
+  padding: 12px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 14px;
+  margin-bottom: 12px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.feedback-panel textarea:focus {
+  border-color: #2196F3;
+}
+
+.feedback-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.cancel-button, .submit-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.cancel-button:hover {
+  filter: brightness(1.1);
+}
+
+.submit-button {
+  background-color: #2196F3;
+  color: white;
+}
+
+.submit-button:hover {
+  background-color: #0d8bf2;
+}
+
+.submit-button:disabled, .cancel-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.message {
+  padding: 10px;
+  border-radius: 5px;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.message.error {
+  background-color: rgba(244, 67, 54, 0.1);
+  color: #f44336;
+}
+
+.message.success {
+  background-color: rgba(76, 175, 80, 0.1);
+  color: #4caf50;
+}

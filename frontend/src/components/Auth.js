@@ -1,16 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '../supabaseClient';
-
-const THEME_KEY = 'theme';
 
 const Auth = ({ darkMode }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Show loader during authentication
+  const showAuthLoader = () => {
+    setLoading(true);
+    
+    // Create loader element if it doesn't exist
+    let loaderElement = document.querySelector('.loader-container');
+    if (!loaderElement) {
+      loaderElement = document.createElement('div');
+      loaderElement.className = 'loader-container';
+      loaderElement.innerHTML = `
+        <div class="loader">
+          <div class="loader-square"></div>
+          <div class="loader-square"></div>
+          <div class="loader-square"></div>
+          <div class="loader-square"></div>
+          <div class="loader-square"></div>
+          <div class="loader-square"></div>
+          <div class="loader-square"></div>
+        </div>
+      `;
+      document.body.appendChild(loaderElement);
+    } else {
+      // Make sure any existing loader is visible
+      loaderElement.classList.remove('fade-out');
+      loaderElement.style.opacity = '1';
+      loaderElement.style.visibility = 'visible';
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     try {
-      setLoading(true);
+      showAuthLoader();
       setError('');
       
       // Configure the Google OAuth provider options with additional parameters
@@ -30,41 +57,92 @@ const Auth = ({ darkMode }) => {
     } catch (err) {
       console.error("Google sign-in error:", err);
       setError(err.message || 'An error occurred during Google sign-in');
-    } finally {
       setLoading(false);
+      
+      // Hide loader on error
+      const loaderElement = document.querySelector('.loader-container');
+      if (loaderElement) {
+        loaderElement.classList.add('fade-out');
+      }
     }
   };
 
   const handleGuestLogin = async () => {
     try {
-      setLoading(true);
-      setError('');
+      // Create a random guest ID
+      const guestId = 'guest_' + Math.random().toString(36).substring(2, 15);
       
-      // Create an anonymous session
-      const { data, error } = await supabase.auth.signInAnonymously();
-      
-      if (error) throw error;
-      
-      // Set up initial user preferences in Supabase
-      if (data?.user) {
-        const { error: prefError } = await supabase
+      // Initialize guest data in Supabase
+      try {
+        const { error } = await supabase
           .from('user_preferences')
-          .upsert({
-            user_id: data.user.id,
+          .insert({
+            user_id: guestId,
+            calls_left: 3,
             dark_mode: true,
-            calls_left: 5,
-            is_admin: false
+            is_admin: false,
+            created_at: new Date(),
+            updated_at: new Date()
           });
-        
-        if (prefError) console.error('Error setting initial preferences:', prefError);
+          
+        if (error && !error.message.includes('duplicate')) {
+          console.error('Error creating guest account:', error);
+        }
+      } catch (err) {
+        console.error('Could not initialize guest in Supabase:', err);
       }
       
-    } catch (err) {
-      setError(err.message || 'An error occurred during guest login');
-    } finally {
+      // Always set calls_left to 3 for guests in localStorage
+      localStorage.setItem('plektu_calls_left', '3');
+      
+      // Set bypass auth flag
+      localStorage.setItem('bypass_auth', 'true');
+      
+      // Redirect to main app
+      window.location.reload();
+    } catch (error) {
+      console.error('Guest login error:', error.message);
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!loading) {
+      const loaderElement = document.querySelector('.loader-container');
+      if (loaderElement) {
+        loaderElement.classList.add('fade-out');
+      }
+    }
+  }, [loading]);
+
+  useEffect(() => {
+    // Remove loader when authentication is complete
+    const handleAuthStateChange = (event, session) => {
+      if (event === 'SIGNED_IN') {
+        // Wait for 3 seconds before fading out the loader
+        setTimeout(() => {
+          const loaderElement = document.querySelector('.loader-container');
+          if (loaderElement) {
+            loaderElement.classList.add('fade-out');
+            
+            // Remove the element completely after animation finishes
+            setTimeout(() => {
+              if (loaderElement.parentNode) {
+                loaderElement.parentNode.removeChild(loaderElement);
+              }
+            }, 800);
+          }
+          setLoading(false);
+        }, 3000); // Make loader last 3 seconds
+      }
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   return (
     <motion.div
