@@ -12,6 +12,9 @@ const BANNED_TERMS = [
   'die', 
   'death threat', 
   'bomb',
+  'threat',
+  'skibidi',
+  '911',
   'terrorist',
   'shoot',
   'murder',
@@ -27,7 +30,7 @@ const BANNED_TERMS = [
 export const moderateTopic = (topic, isPremium = false) => {
   // Skip basic moderation for premium users (they'll still get server-side moderation)
   if (isPremium) {
-    return { allowed: true };
+    return { allowed: false };
   }
   
   // Basic client-side moderation for regular users
