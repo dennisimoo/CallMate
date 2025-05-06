@@ -514,27 +514,28 @@ function App() {
     }
     setLoading(false);
   };
-
-  const handleAdminLogin = (e) => {
-    e.preventDefault();
-    if (adminPass === 'premium1001' || adminPass === 'PREMIUM1001')
-      setIsAdmin(true);
-      setAdminPass('');
-      setActiveTab('main');
-      setShowPremiumPopup(true);
-      
-      // Auto-hide the popup after 6 seconds
-      setTimeout(() => {
-        setShowPremiumPopup(false);
-      }, 6000);
-    } else {
-      alert('Incorrect premium code');
-    }
-  };
+const handleAdminLogin = (e) => {
+  e.preventDefault();
   
-  const handleLogout = () => {
-    setIsAdmin(false);
-  };
+  if (adminPass === 'premium1001' || adminPass === 'PREMIUM1001') {
+    setIsAdmin(true);
+    setAdminPass('');
+    setActiveTab('main');
+    setShowPremiumPopup(true);
+    
+    // Auto-hide the popup after 6 seconds
+    setTimeout(() => {
+      setShowPremiumPopup(false);
+    }, 6000);
+  } else {
+    alert('Incorrect premium code');
+  }
+};
+
+const handleLogout = () => {
+  setIsAdmin(false);
+};
+
 
   // Toggle dark/light mode
   const toggleTheme = () => {
