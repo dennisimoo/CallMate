@@ -517,8 +517,7 @@ function App() {
 
   const handleAdminLogin = (e) => {
     e.preventDefault();
-    if (adminPass === 'premium1001') || (adminPass === 'PREMIUM1001') {
-      
+    if (adminPass === 'premium1001' || adminPass === 'PREMIUM1001')
       setIsAdmin(true);
       setAdminPass('');
       setActiveTab('main');
