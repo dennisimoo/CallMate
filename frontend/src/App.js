@@ -15,7 +15,7 @@ import CallHistory from './components/CallHistory';
 import { supabase } from './supabaseClient';
 import { moderateTopic } from './utils/ContentModeration';
 
-const MAX_CALLS = 5;
+const MAX_CALLS = 10;
 const CALLS_KEY = 'plektu_calls_left';
 const PHONE_KEY = 'plektu_phone';
 const ADMIN_KEY = 'plektu_admin';
@@ -517,7 +517,7 @@ function App() {
 
   const handleAdminLogin = (e) => {
     e.preventDefault();
-    if (adminPass === 'chairman') or (adminPass === 'CHAIRMAN') {
+    if (adminPass === 'premium1001') || (adminPass === 'PREMIUM1001') {
       
       setIsAdmin(true);
       setAdminPass('');
