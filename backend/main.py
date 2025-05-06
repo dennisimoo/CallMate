@@ -47,7 +47,7 @@ def get_current_user_id(user_id: str = Header(None)):
     return user_id
 
 # Constants    
-MAX_CALLS_PER_GUEST = 3
+MAX_CALLS_PER_GUEST = 10
 MAX_CALLS_PER_USER = 5
 MAX_DURATION = 60  # seconds
 
