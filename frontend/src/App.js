@@ -1559,22 +1559,30 @@ const handleLogout = () => {
               }}
             >
               <div>
-                by <a 
-                  href="https://github.com/dennisimoo" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  style={{ color: darkMode ? '#8ee' : '#0077cc', textDecoration: 'none' }}
-                >
-                  Dennis K.
-                </a> & <a 
-                  href="https://github.com/Neekoras" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  style={{ color: darkMode ? '#8ee' : '#0077cc', textDecoration: 'none' }}
-                >
-                  Nicholas L.
-                </a>
-              </div>
+  by <a 
+    href="https://github.com/dennisimoo" 
+    target="_blank" 
+    rel="noopener noreferrer"
+    style={{ color: darkMode ? '#8ee' : '#0077cc', textDecoration: 'none' }}
+  >
+    Dennis K.
+  </a> & <a 
+    href="https://github.com/Neekoras" 
+    target="_blank" 
+    rel="noopener noreferrer"
+    style={{ color: darkMode ? '#8ee' : '#0077cc', textDecoration: 'none' }}
+  >
+    Nicholas L.
+  </a> & <a 
+    href="https://www.youtube.com/@julianwhitfield2158" 
+    target="_blank" 
+    rel="noopener noreferrer"
+    style={{ color: darkMode ? '#8ee' : '#0077cc', textDecoration: 'none' }}
+  >
+    Julian W.
+  </a>
+</div>
+
               {lastUpdated && (
                 <div style={{ fontSize: 11 }}>
                   Last updated: {lastUpdated.toLocaleDateString('en-US', { 
