@@ -188,6 +188,30 @@ const Header = ({
             }}></span>
           )}
         </motion.button>
+        <motion.button 
+          onClick={() => setActiveTab('sms')} 
+          whileHover={{ 
+            scale: 1.03,
+            transition: { duration: 0.3, ease: "easeOut" }
+          }}
+          whileTap={{ 
+            scale: 0.97,
+            transition: { duration: 0.1, ease: "easeOut" }
+          }}
+          style={{ 
+            padding: '8px 16px', 
+            fontSize: 14, 
+            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            border: 'none', 
+            background: activeTab === 'sms' ? (darkMode ? '#444' : '#222') : (darkMode ? '#333' : '#e0e0e0'), 
+            color: activeTab === 'sms' ? '#fff' : (darkMode ? '#ccc' : '#222'), 
+            borderRadius: 6, 
+            cursor: 'pointer',
+            fontWeight: 500
+          }}
+        >
+          SMS
+        </motion.button>
       </div>
       
       {/* Right side - Settings and Sign Out */}

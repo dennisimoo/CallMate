@@ -68,6 +68,12 @@ class CallRecord(BaseModel):
     transcript: str = None
     user_id: str = None
 
+class SMSRequest(BaseModel):
+    phone_number: str
+    message: str
+    admin: Optional[bool] = False
+    user_id: Optional[str] = None
+
 # Gemini moderation function
 def moderate_call(topic: str, phone_number: str = None) -> dict:
     """Moderate call content using Gemini API and check for emergency numbers"""
@@ -719,6 +725,101 @@ def get_call_corrected_transcript(call_id: str, user_id: Optional[str] = None):
         return {"status": "error", "message": "Transcript not available for this call"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting call transcript: {str(e)}")
+
+@app.post("/api/sms")
+async def send_sms(req: SMSRequest):
+    if not os.getenv("TEXT_KEY"):
+        raise HTTPException(status_code=500, detail="TEXT_KEY not set in environment.")
+
+    is_admin = req.admin
+    user_id = req.user_id
+
+    # Implement SMS limits (3 for guests, 10 for authenticated)
+    # NOTE: This in-memory history is not ideal for production, consider using a persistent store like Supabase
+    # For now, we'll use a simple counter per phone number for demonstration
+    phone_number = req.phone_number
+    message = req.message
+
+    if not is_admin:
+        # This is a very basic limit implementation and needs improvement
+        # A proper implementation would track SMS sent per user/phone number over a time period
+        # For this example, we'll just use a simple counter tied to the phone number in memory
+        if phone_number not in call_history: # Reusing call_history for simplicity, ideally would have sms_history
+            call_history[phone_number] = []
+
+        # Count SMS sent (using a placeholder status "sms_sent")
+        sms_sent_count = len([item for item in call_history[phone_number] if item.get("type") == "sms"])
+
+        if user_id:
+            max_sms = 10
+        else:
+            max_sms = 3
+
+        if sms_sent_count >= max_sms:
+            return {"message": f"You have reached the maximum number of SMS messages ({max_sms})."}
+
+    textbelt_url = "https://textbelt.com/text"
+    headers = {'Content-Type': 'application/json'}
+    # Using data-urlencode as per documentation for POST data
+    payload = {
+        'phone': phone_number,
+        'message': message,
+        'key': os.getenv("TEXT_KEY")
+    }
+
+    try:
+        # Make the POST request to Textbelt
+        resp = requests.post(textbelt_url, json=payload)
+        data = resp.json()
+
+        if data.get("success"):
+            # Record successful SMS send (using a placeholder type "sms")
+            if phone_number not in call_history:
+                call_history[phone_number] = []
+            call_history[phone_number].append({
+                "type": "sms",
+                "status": "success",
+                "timestamp": datetime.now().isoformat(),
+                "phone_number": phone_number,
+                "message_id": data.get("textId") # Textbelt returns textId on success
+            })
+            # In a real app, you might save this to Supabase as well, similar to calls
+
+            return {
+                "message": "SMS sent successfully!",
+                "success": True,
+                "quotaRemaining": data.get("quotaRemaining"),
+                "textId": data.get("textId")
+            }
+        else:
+            # Record failed SMS send
+            if phone_number not in call_history:
+                call_history[phone_number] = []
+            call_history[phone_number].append({
+                "type": "sms",
+                "status": "error",
+                "timestamp": datetime.now().isoformat(),
+                "phone_number": phone_number,
+                "error": data.get("error")
+            })
+            # In a real app, you might save this to Supabase as well
+
+            raise HTTPException(status_code=400, detail=f"Failed to send SMS: {data.get('error')}")
+
+    except Exception as e:
+        # Record exception during SMS send
+        if phone_number not in call_history:
+            call_history[phone_number] = []
+        call_history[phone_number].append({
+            "type": "sms",
+            "status": "exception",
+            "timestamp": datetime.now().isoformat(),
+            "phone_number": phone_number,
+            "error": str(e)
+        })
+        # In a real app, you might save this to Supabase as well
+
+        raise HTTPException(status_code=500, detail=f"Error sending SMS: {str(e)}")
 
 # --- Gemini summarization for call topics ---
 async def summarize_topic_internal(topic: str):

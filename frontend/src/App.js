@@ -12,8 +12,10 @@ import Settings from './components/Settings';
 import Feedback from './components/Feedback';
 import CallDetails from './components/CallDetails';
 import CallHistory from './components/CallHistory';
+import SMSForm from './components/SMSForm';
 import { supabase } from './supabaseClient';
 import { moderateTopic } from './utils/ContentModeration';
+import { PhoneInput, TopicInput, SubmitButton, MessageInput, SMSSubmitButton } from './components/InputFields';
 
 const MAX_CALLS = 10;
 const CALLS_KEY = 'plektu_calls_left';
@@ -95,6 +97,12 @@ function App() {
   const [loaderShown, setLoaderShown] = useState(false);
   const [showPremiumPopup, setShowPremiumPopup] = useState(false);
   const [selectedCallId, setSelectedCallId] = useState(null);
+  const [message, setMessage] = useState('');
+  const [smsLeft, setSmsLeft] = useState(() => {
+    // Always set from correct source on load
+    const stored = localStorage.getItem('plektu_sms_left');
+    return stored ? parseInt(stored, 10) : 3; // Default to 3 for guests
+  });
 
   // eslint-disable-next-line no-unused-vars
   const [topicSummary, setTopicSummary] = useState('');
@@ -514,28 +522,28 @@ function App() {
     }
     setLoading(false);
   };
-const handleAdminLogin = (e) => {
-  e.preventDefault();
-  
-  if (adminPass === 'premium1001' || adminPass === 'PREMIUM1001') {
-    setIsAdmin(true);
-    setAdminPass('');
-    setActiveTab('main');
-    setShowPremiumPopup(true);
+
+  const handleAdminLogin = (e) => {
+    e.preventDefault();
     
-    // Auto-hide the popup after 6 seconds
-    setTimeout(() => {
-      setShowPremiumPopup(false);
-    }, 6000);
-  } else {
-    alert('Incorrect premium code');
-  }
-};
+    if (adminPass === 'premium1001' || adminPass === 'PREMIUM1001') {
+      setIsAdmin(true);
+      setAdminPass('');
+      setActiveTab('main');
+      setShowPremiumPopup(true);
+      
+      // Auto-hide the popup after 6 seconds
+      setTimeout(() => {
+        setShowPremiumPopup(false);
+      }, 6000);
+    } else {
+      alert('Incorrect premium code');
+    }
+  };
 
-const handleLogout = () => {
-  setIsAdmin(false);
-};
-
+  const handleLogout = () => {
+    setIsAdmin(false);
+  };
 
   // Toggle dark/light mode
   const toggleTheme = () => {
@@ -685,278 +693,190 @@ const handleLogout = () => {
     return () => window.removeEventListener('navigateToTab', handleNavigate);
   }, []);
 
+  const handleSMS = async (e) => {
+    e.preventDefault();
+    if (!phone || !message) return;
+
+    setLoading(true);
+    setStatus('');
+
+    try {
+      const response = await fetch('/api/sms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone_number: phone,
+          message: message,
+          admin: isAdmin,
+          user_id: session?.user?.id
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setStatus(data.message);
+        if (!isAdmin) {
+          setSmsLeft(prev => {
+            const newCount = prev - 1;
+            localStorage.setItem('plektu_sms_left', newCount.toString());
+            return newCount;
+          });
+        }
+        setMessage(''); // Clear message after successful send
+      } else {
+        setStatus(data.detail || 'Failed to send SMS');
+      }
+    } catch (error) {
+      console.error('Error sending SMS:', error);
+      setStatus('Error sending SMS');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderMainTab = () => (
-    <motion.form 
-      onSubmit={handleCall} 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ 
-        duration: 0.8, 
-        ease: [0.2, 0.65, 0.3, 0.9]
-      }}
-      style={{ 
-        background: darkMode ? '#222' : '#fff', 
-        color: darkMode ? '#fff' : '#222',
-        borderRadius: 10, 
-        boxShadow: darkMode ? '0 2px 16px rgba(0,0,0,0.3)' : '0 2px 16px rgba(0,0,0,0.1)', 
-        padding: 28, 
-        width: windowSize.width < 768 ? '90%' : 340, 
-        display: 'flex', 
-        flexDirection: 'column', 
-        gap: 16
-      }}
-    >
-      <motion.h2 
-        initial={{ opacity: 0, x: -50 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ 
-          duration: 1, 
-          ease: [0.2, 0.65, 0.3, 0.9],
-          type: "tween" 
-        }}
-        style={{ 
-          margin: 0, 
-          color: darkMode ? '#fff' : '#222', 
-          fontWeight: 600, 
-          fontSize: 22, 
-          letterSpacing: -1 
-        }}
-      >
-        Plektu
-      </motion.h2>
-      
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ 
-          duration: 0.8, 
-          delay: 0.1,
-          ease: "easeOut"
-        }}
-        style={{ fontSize: 14, color: darkMode ? '#ccc' : '#555', marginBottom: 5, lineHeight: 1.4 }}
-      >
-        Plektu will make an AI-powered call for you. Just enter a phone number and topic to get started!
-        {!isAdmin && (
-          <div style={{ 
-            fontSize: 13, 
-            marginTop: 5, 
-            color: darkMode ? '#ddd' : '#555', 
-            fontWeight: 500,
-            backgroundColor: darkMode ? 'rgba(50,50,50,0.3)' : 'rgba(240,240,240,0.8)',
-            padding: '4px 8px',
-            borderRadius: 4,
-            display: 'inline-block'
-          }}>
-            Available Calls: <span style={{ fontWeight: 600 }}>{callsLeft}</span> / {session?.user?.id ? 5 : 3}
-          </div>
-        )}
-      </motion.div>
-      
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <motion.form 
+        onSubmit={handleCall} 
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ 
           duration: 0.8, 
-          delay: 0.2,
-          ease: "easeOut"
+          ease: [0.2, 0.65, 0.3, 0.9]
+        }}
+        style={{ 
+          background: darkMode ? '#222' : '#fff', 
+          color: darkMode ? '#fff' : '#222',
+          borderRadius: 10, 
+          boxShadow: darkMode ? '0 2px 16px rgba(0,0,0,0.3)' : '0 2px 16px rgba(0,0,0,0.1)', 
+          padding: 28, 
+          width: windowSize.width < 768 ? '90%' : 340, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: 16
         }}
       >
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
+        <motion.h2 
+          initial={{ opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ 
+            duration: 1, 
+            ease: [0.2, 0.65, 0.3, 0.9],
+            type: "tween" 
+          }}
           style={{ 
-            display: 'flex',
-            flexDirection: 'column',
-            position: 'relative',
-            marginBottom: 16
+            margin: 0, 
+            color: darkMode ? '#fff' : '#222', 
+            fontWeight: 600, 
+            fontSize: 22, 
+            letterSpacing: -1 
           }}
         >
-          <label 
-            htmlFor="phone" 
-            style={{ 
-              marginBottom: 6, 
-              color: darkMode ? '#aaa' : '#666',
-              fontSize: 13 
-            }}
-          >
-            Phone Number
-          </label>
-          <motion.input
-            id="phone"
-            type="tel"
-            pattern="[0-9]*"
-            inputMode="numeric"
-            autoComplete="tel"
-            placeholder="Enter your phone number"
-            value={phone}
-            onChange={(e) => {
-              // Only allow numeric input
-              const numericValue = e.target.value.replace(/[^0-9]/g, '');
-              setPhone(numericValue);
-            }}
-            style={{
-              padding: 12,
-              fontSize: 16,
-              fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-              borderRadius: 8,
-              border: darkMode ? '1px solid #444' : '1px solid #ddd',
-              background: darkMode ? '#333' : '#fff',
-              color: darkMode ? '#fff' : '#333',
-              marginBottom: 16,
-              boxSizing: 'border-box',
-              width: '100%'
-            }}
-            required
-          />
-        </motion.div>
-      </motion.div>
-      
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ 
-          duration: 0.8, 
-          delay: 0.3,
-          ease: "easeOut"
-        }}
-        style={{ position: "relative" }}
-      >
-        <textarea
-          placeholder="Describe your conversation topic"
-          value={topic}
-          onChange={e => {
-            setTopic(e.target.value);
-          }}
-          style={{ 
-            padding: 12,
-            fontSize: 16,
-            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-            borderRadius: 8,
-            border: darkMode ? '1px solid #444' : '1px solid #ccc',
-            backgroundColor: darkMode ? '#333' : '#fff',
-            color: darkMode ? '#fff' : '#333',
-            minHeight: 48,
-            resize: 'vertical',
-            width: '100%',
-            boxSizing: 'border-box',
-            position: "relative",
-            zIndex: 2
-          }}
-          required
-        />
-      </motion.div>
-      
-      <motion.button 
-        type="submit" 
-        disabled={loading || (!isAdmin && callsLeft === 0)} 
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ 
-          duration: 0.8, 
-          delay: 0.4,
-          ease: "easeOut"
-        }}
-        whileHover={{ 
-          scale: 1.02,
-          transition: { duration: 0.3, ease: "easeOut" }
-        }}
-        whileTap={{ 
-          scale: 0.98,
-          transition: { duration: 0.1, ease: "easeOut" }
-        }}
-        style={{ 
-          padding: 12,
-          fontSize: 16,
-          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-          borderRadius: 8,
-          border: 'none',
-          background: 'rgb(136, 238, 238)',
-          color: '#222',
-          cursor: loading || (!isAdmin && callsLeft === 0) ? 'not-allowed' : 'pointer',
-          fontWeight: 500,
-          width: '100%'
-        }}
-      >
-        {loading ? 'Calling...' : 'Call'}
-      </motion.button>
-      
-      {isAdmin && (
+          Plektu Call
+        </motion.h2>
+        
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ 
             duration: 0.8, 
-            delay: 0.5,
+            delay: 0.1,
             ease: "easeOut"
           }}
-          style={{ fontSize: 14, color: darkMode ? '#8ee' : '#33a', textAlign: 'center' }}
+          style={{ fontSize: 14, color: darkMode ? '#ccc' : '#555', marginBottom: 5, lineHeight: 1.4 }}
         >
-          Premium Mode - Unlimited Calls
-          <motion.button 
-            onClick={handleLogout} 
-            whileHover={{ 
-              scale: 1.05,
-              transition: { duration: 0.3, ease: "easeOut" }
-            }}
-            whileTap={{ 
-              scale: 0.95,
-              transition: { duration: 0.1, ease: "easeOut" }
-            }}
-            style={{ 
-              marginLeft: 8, 
-              fontSize: 12, 
-              padding: '4px 8px', 
-              border: 'none', 
-              background: darkMode ? '#333' : '#f0f0f0', 
-              color: darkMode ? '#fff' : '#333',
-              borderRadius: 4, 
-              cursor: 'pointer' 
-            }}
-          >
-            Logout
-          </motion.button>
+          Plektu will make an AI-powered call for you. Just enter a phone number and topic to get started!
+          {!isAdmin && (
+            <div style={{ 
+              fontSize: 13, 
+              marginTop: 5, 
+              color: darkMode ? '#ddd' : '#555', 
+              fontWeight: 500,
+              backgroundColor: darkMode ? 'rgba(50,50,50,0.3)' : 'rgba(240,240,240,0.8)',
+              padding: '4px 8px',
+              borderRadius: 4,
+              display: 'inline-block'
+            }}>
+              Available Calls: <span style={{ fontWeight: 600 }}>{callsLeft}</span> / {session?.user?.id ? 5 : 3}
+            </div>
+          )}
         </motion.div>
-      )}
-      
-      <AnimatePresence>
-        {status && (
+        
+        <PhoneInput phone={phone} setPhone={setPhone} darkMode={darkMode} />
+        <TopicInput topic={topic} setTopic={setTopic} darkMode={darkMode} />
+        <SubmitButton loading={loading} isAdmin={isAdmin} callsLeft={callsLeft} darkMode={darkMode} />
+        
+        {isAdmin && (
           <motion.div 
-            initial={{ opacity: 0, y: 5, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: 'auto' }}
-            exit={{ opacity: 0, y: -5, height: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={{ 
-              duration: 0.5,
-              ease: "easeInOut"
+              duration: 0.8, 
+              delay: 0.5,
+              ease: "easeOut"
             }}
-            style={{ 
-              marginTop: 8, 
-              padding: '12px', 
-              borderRadius: '8px',
-              backgroundColor: darkMode 
-                ? (status.includes('Call triggered') ? 'rgba(46, 125, 50, 0.2)' : (status.startsWith('This topic') || status.startsWith('You have reached')) ? 'rgba(176, 0, 32, 0.2)' : 'rgba(255, 255, 255, 0.1)') 
-                : (status.includes('Call triggered') ? '#e8f5e9' : (status.startsWith('This topic') || status.startsWith('You have reached')) ? '#ffebee' : '#f5f5f5'),
-              color: darkMode 
-                ? (status.includes('Call triggered') ? '#81c784' : (status.startsWith('This topic') || status.startsWith('You have reached')) ? '#f48fb1' : '#fff')
-                : (status.includes('Call triggered') ? '#2e7d32' : (status.startsWith('This topic') || status.startsWith('You have reached')) ? '#b00020' : '#333'),
-              fontWeight: 500, 
-              textAlign: 'center',
-              boxShadow: darkMode ? 'none' : '0 1px 3px rgba(0,0,0,0.1)'
-            }}
+            style={{ fontSize: 14, color: darkMode ? '#8ee' : '#33a', textAlign: 'center' }}
           >
-            {status.replace('Bland.ai call triggered!', 'Call triggered!')}
-            {status.includes('Call triggered') && (
-              <div style={{marginTop: 5, fontSize: 13, fontWeight: 'normal'}}>
-                The number you chose will receive a call shortly. Please wait...
-              </div>
-            )}
+            Premium Mode - Unlimited Calls
+            <motion.button 
+              onClick={handleLogout} 
+              whileHover={{ 
+                scale: 1.05,
+                transition: { duration: 0.3, ease: "easeOut" }
+              }}
+              whileTap={{ 
+                scale: 0.95,
+                transition: { duration: 0.1, ease: "easeOut" }
+              }}
+              style={{ 
+                marginLeft: 8, 
+                fontSize: 12, 
+                padding: '4px 8px', 
+                border: 'none', 
+                background: darkMode ? '#333' : '#f0f0f0', 
+                color: darkMode ? '#fff' : '#333',
+                borderRadius: 4, 
+                cursor: 'pointer' 
+              }}
+            >
+              Logout
+            </motion.button>
           </motion.div>
         )}
-      </AnimatePresence>
-      
-      {/* Removed call history section from main tab - it's now only in the Call History tab */}
-      
-    </motion.form>
+        
+        <AnimatePresence>
+          {status && (
+            <motion.div 
+              initial={{ opacity: 0, y: 5, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, y: -5, height: 0 }}
+              transition={{ 
+                duration: 0.5,
+                ease: "easeInOut"
+              }}
+              style={{ 
+                marginTop: 8, 
+                padding: '12px', 
+                borderRadius: '8px',
+                backgroundColor: darkMode 
+                  ? (status.includes('Call triggered') ? 'rgba(46, 125, 50, 0.2)' : (status.startsWith('This topic') || status.startsWith('You have reached')) ? 'rgba(176, 0, 32, 0.2)' : 'rgba(255, 255, 255, 0.1)') 
+                  : (status.includes('Call triggered') ? 'rgba(46, 125, 50, 0.1)' : (status.startsWith('This topic') || status.startsWith('You have reached')) ? 'rgba(176, 0, 32, 0.1)' : 'rgba(0, 0, 0, 0.05)'),
+                color: darkMode 
+                  ? (status.includes('Call triggered') ? '#8ee' : (status.startsWith('This topic') || status.startsWith('You have reached')) ? '#f88' : '#fff') 
+                  : (status.includes('Call triggered') ? '#33a' : (status.startsWith('This topic') || status.startsWith('You have reached')) ? '#a33' : '#333'),
+                fontSize: 14,
+                fontWeight: 500
+              }}
+            >
+              {status}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.form>
+    </div>
   );
   
   const renderPremiumTab = () => (
@@ -1295,6 +1215,31 @@ const handleLogout = () => {
                   }}
                 >
                   {renderMainTab()}
+                </motion.div>
+              ) : activeTab === 'sms' ? (
+                <motion.div
+                  key="sms"
+                  initial={{ opacity: 0, x: -30 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 30 }}
+                  transition={{ 
+                    duration: 0.6,
+                    ease: [0.2, 0.65, 0.3, 0.9]
+                  }}
+                >
+                  <SMSForm
+                    handleSMS={handleSMS}
+                    phone={phone}
+                    setPhone={setPhone}
+                    message={message}
+                    setMessage={setMessage}
+                    isAdmin={isAdmin}
+                    smsLeft={smsLeft}
+                    loading={loading}
+                    status={status}
+                    darkMode={darkMode}
+                    windowSize={windowSize}
+                  />
                 </motion.div>
               ) : activeTab === 'chat' ? (
                 <motion.div
