@@ -14,7 +14,7 @@ export const PhoneInput = ({ phone, setPhone, darkMode }) => {
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        marginBottom: 16
+        marginBottom: 0
       }}
     >
       <label 
@@ -30,27 +30,33 @@ export const PhoneInput = ({ phone, setPhone, darkMode }) => {
       <motion.input
         id="phone"
         type="tel"
-        pattern="[0-9]*"
-        inputMode="numeric"
+        inputMode="tel"
         autoComplete="tel"
-        placeholder="Enter your phone number"
+        placeholder="Enter 10-digit phone number"
         value={phone}
         onChange={(e) => {
-          // Only allow numeric input
-          const numericValue = e.target.value.replace(/[^0-9]/g, '');
-          setPhone(numericValue);
+          // Allow digits and spaces, but store only digits
+          const inputValue = e.target.value;
+          const numericValue = inputValue.replace(/[^0-9]/g, '');
+          
+          // Only accept if it's within valid length (up to 11 digits)
+          if (numericValue.length <= 11) {
+            setPhone(numericValue);
+          }
         }}
         style={{
           padding: 12,
           fontSize: 16,
           fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           borderRadius: 8,
-          border: darkMode ? '1px solid #444' : '1px solid #ddd',
-          background: darkMode ? '#333' : '#fff',
+          border: darkMode ? '1px solid #444' : '1px solid #ccc',
+          backgroundColor: darkMode ? '#333' : '#fff',
           color: darkMode ? '#fff' : '#333',
-          marginBottom: 16,
+          marginBottom: 10,
           boxSizing: 'border-box',
-          width: '100%'
+          width: '100%',
+          position: "relative",
+          zIndex: 2
         }}
         required
       />
@@ -59,9 +65,39 @@ export const PhoneInput = ({ phone, setPhone, darkMode }) => {
 };
 
 /**
- * Topic textarea input with animation
+ * Topic input with animation using fill-in-the-blank format
  */
 export const TopicInput = ({ topic, setTopic, darkMode }) => {
+  // Get the initial values directly from the input ref
+  const [personValue, setPersonValue] = React.useState("");
+  const [aboutValue, setAboutValue] = React.useState("");
+  
+  // Initialize the values on component mount or when topic changes
+  React.useEffect(() => {
+    if (topic) {
+      // Use more permissive regex to extract values with spaces
+      const personMatch = topic.match(/PERSON:\s*([^,]*),?/);
+      const aboutMatch = topic.match(/ABOUT:\s*(.*)$/);
+      
+      if (personMatch && personMatch[1]) setPersonValue(personMatch[1].trim());
+      if (aboutMatch && aboutMatch[1]) setAboutValue(aboutMatch[1].trim());
+    }
+  }, [topic]);
+  
+  // Directly set person value and update topic
+  const handlePersonChange = (e) => {
+    const value = e.target.value;
+    setPersonValue(value);
+    setTopic(`PERSON: ${value}, ABOUT: ${aboutValue}`);
+  };
+  
+  // Directly set about value and update topic
+  const handleAboutChange = (e) => {
+    const value = e.target.value;
+    setAboutValue(value);
+    setTopic(`PERSON: ${personValue}, ABOUT: ${value}`);
+  };
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
@@ -73,12 +109,22 @@ export const TopicInput = ({ topic, setTopic, darkMode }) => {
       }}
       style={{ position: "relative" }}
     >
-      <textarea
-        placeholder="Describe your conversation topic"
-        value={topic}
-        onChange={e => {
-          setTopic(e.target.value);
+      <label 
+        style={{ 
+          marginBottom: 6, 
+          color: darkMode ? '#aaa' : '#666',
+          fontSize: 13,
+          display: 'block'
         }}
+      >
+        You will be talking to...
+      </label>
+      
+      <input
+        type="text"
+        placeholder="Who will you be talking to?"
+        value={personValue}
+        onChange={handlePersonChange}
         style={{ 
           padding: 12,
           fontSize: 16,
@@ -87,12 +133,43 @@ export const TopicInput = ({ topic, setTopic, darkMode }) => {
           border: darkMode ? '1px solid #444' : '1px solid #ccc',
           backgroundColor: darkMode ? '#333' : '#fff',
           color: darkMode ? '#fff' : '#333',
-          minHeight: 48,
-          resize: 'vertical',
+          width: '100%',
+          boxSizing: 'border-box',
+          marginBottom: 16
+        }}
+        required
+      />
+      
+      <label 
+        style={{ 
+          marginBottom: 6, 
+          color: darkMode ? '#aaa' : '#666',
+          fontSize: 13,
+          display: 'block'
+        }}
+      >
+        And then about...
+      </label>
+      
+      <textarea
+        placeholder="What will the conversation be about?"
+        value={aboutValue}
+        onChange={handleAboutChange}
+        style={{ 
+          padding: 12,
+          fontSize: 16,
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          borderRadius: 8,
+          border: darkMode ? '1px solid #444' : '1px solid #ccc',
+          backgroundColor: darkMode ? '#333' : '#fff',
+          color: darkMode ? '#fff' : '#333',
           width: '100%',
           boxSizing: 'border-box',
           position: "relative",
-          zIndex: 2
+          zIndex: 2,
+          resize: "vertical",
+          minHeight: "42px",
+          height: "42px"
         }}
         required
       />
@@ -156,6 +233,17 @@ export const MessageInput = ({ message, setMessage, darkMode }) => {
       }}
       style={{ position: "relative" }}
     >
+      <label 
+        style={{ 
+          marginBottom: 6, 
+          color: darkMode ? '#aaa' : '#666',
+          fontSize: 13,
+          display: 'block'
+        }}
+      >
+        Message
+      </label>
+      
       <textarea
         placeholder="Enter your SMS message"
         value={message}

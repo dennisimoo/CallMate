@@ -15,7 +15,8 @@ import CallHistory from './components/CallHistory';
 import SMSForm from './components/SMSForm';
 import { supabase } from './supabaseClient';
 import { moderateTopic } from './utils/ContentModeration';
-import { PhoneInput, TopicInput, SubmitButton, MessageInput, SMSSubmitButton } from './components/InputFields';
+import { PhoneInput, SubmitButton, MessageInput, SMSSubmitButton } from './components/InputFields';
+import FixedTopicInput from "./components/FixedTopicInput";
 
 const MAX_CALLS = 10;
 const CALLS_KEY = 'plektu_calls_left';
@@ -90,7 +91,7 @@ function App() {
     callsLeft: MAX_CALLS,
     phoneNumber: ''
   });
-  const [appVersion, setAppVersion] = useState('2.0.0');
+  const [appVersion, setAppVersion] = useState('2.0.1');
   // eslint-disable-next-line no-unused-vars
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedback, setFeedback] = useState('');
@@ -407,10 +408,18 @@ function App() {
     try {
       console.log("Call attempt - isAdmin:", isAdmin, "callsLeft:", callsLeft, "phone:", phone);
       
+      // Validate phone number format (must be 10 or 11 digits)
+      const numericPhone = phone.replace(/[^0-9]/g, '');
+      if (numericPhone.length < 10 || numericPhone.length > 11) {
+        setStatus('Please enter a valid 10-digit phone number (or 11 digits with country code 1).');
+        setLoading(false);
+        return;
+      }
+      
       // PREMIUM USERS SHOULD ALWAYS BE ABLE TO MAKE CALLS
       // Only restrict non-premium users based on call limit
       if (!isAdmin && callsLeft <= 0) {
-        setStatus('You have reached the maximum number of calls for your account.');
+        setStatus('You have reached the maximum number of calls (3) allowed. Upgrade to premium for unlimited calls.');
         setLoading(false);
         return;
       }
@@ -502,7 +511,11 @@ function App() {
         
         setStatus('Call placed successfully!');
       } else if (callRes && callRes.message) {
-        setStatus(callRes.message);
+        // Sanitize message to not expose API details
+        const sanitizedMessage = callRes.message
+          .replace(/bland\.[aA][iI]/g, 'service')
+          .replace(/Bland\.[aA][iI]/g, 'service');
+        setStatus(sanitizedMessage);
       } else {
         setStatus('Call failed.');
       }
@@ -518,7 +531,25 @@ function App() {
         }
       }, 800);
     } catch (error) {
-      setStatus((error && error.message) || 'Call failed.');
+      // Sanitize error messages to hide API provider details
+      let errorMessage = 'Call failed.';
+      
+      if (error && error.message) {
+        // Check for specific error patterns and provide friendly messages
+        if (error.message.includes('Phone number must be at least 10 digits')) {
+          errorMessage = 'Please enter a valid 10-digit phone number.';
+        } else if (error.message.includes('Invalid parameters')) {
+          errorMessage = 'Invalid phone number format. Please check and try again.';
+        } else if (error.message.toLowerCase().includes('bland')) {
+          // Hide any reference to Bland.ai
+          errorMessage = 'Call service unavailable. Please try again later.';
+        } else {
+          // Generic error without exposing technical details
+          errorMessage = 'Call failed. Please check your information and try again.';
+        }
+      }
+      
+      setStatus(errorMessage);
     }
     setLoading(false);
   };
@@ -699,8 +730,22 @@ function App() {
 
     setLoading(true);
     setStatus('');
-
+    
     try {
+      // Validate phone number format (must be 10 or 11 digits)
+      const numericPhone = phone.replace(/[^0-9]/g, '');
+      if (numericPhone.length < 10 || numericPhone.length > 11) {
+        setStatus('Please enter a valid 10-digit phone number (or 11 digits with country code 1).');
+        setLoading(false);
+        return;
+      }
+      
+      // Check SMS quota for non-premium users
+      if (!isAdmin && smsLeft <= 0) {
+        setStatus('You have reached the maximum number of SMS messages (3) allowed. Upgrade to premium for unlimited messages.');
+        setLoading(false);
+        return;
+      }
       const response = await fetch('/api/sms', {
         method: 'POST',
         headers: {
@@ -727,11 +772,36 @@ function App() {
         }
         setMessage(''); // Clear message after successful send
       } else {
-        setStatus(data.detail || 'Failed to send SMS');
+        // Sanitize error messages to hide API provider details
+        let errorMessage = 'Failed to send SMS';
+        
+        if (data.detail) {
+          if (data.detail.includes('Phone number must be at least 10 digits')) {
+            errorMessage = 'Please enter a valid 10-digit phone number.';
+          } else if (data.detail.toLowerCase().includes('bland')) {
+            errorMessage = 'SMS service unavailable. Please try again later.';
+          } else if (data.detail.includes('Invalid parameters')) {
+            errorMessage = 'Invalid phone number format. Please check and try again.';
+          }
+        }
+        
+        setStatus(errorMessage);
       }
     } catch (error) {
       console.error('Error sending SMS:', error);
-      setStatus('Error sending SMS');
+      
+      // Sanitize error messages
+      let errorMessage = 'Error sending SMS';
+      
+      if (error && error.message) {
+        if (error.message.includes('Phone number must be at least 10 digits')) {
+          errorMessage = 'Please enter a valid 10-digit phone number.';
+        } else if (error.message.toLowerCase().includes('bland')) {
+          errorMessage = 'SMS service unavailable. Please try again later.';
+        }
+      }
+      
+      setStatus(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -800,13 +870,13 @@ function App() {
               borderRadius: 4,
               display: 'inline-block'
             }}>
-              Available Calls: <span style={{ fontWeight: 600 }}>{callsLeft}</span> / {session?.user?.id ? 5 : 3}
+              Available Calls: <span style={{ fontWeight: 600 }}>{callsLeft}</span> / {isAdmin ? 'Unlimited' : 3}
             </div>
           )}
         </motion.div>
         
         <PhoneInput phone={phone} setPhone={setPhone} darkMode={darkMode} />
-        <TopicInput topic={topic} setTopic={setTopic} darkMode={darkMode} />
+        <FixedTopicInput topic={topic} setTopic={setTopic} darkMode={darkMode} />
         <SubmitButton loading={loading} isAdmin={isAdmin} callsLeft={callsLeft} darkMode={darkMode} />
         
         {isAdmin && (

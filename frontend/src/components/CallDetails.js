@@ -12,6 +12,10 @@ const CallDetails = ({ callId, darkMode }) => {
   const [downloadingTranscript, setDownloadingTranscript] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(null);
 
+  // Cache to avoid excessive API calls
+  const [lastFetchTime, setLastFetchTime] = useState({});
+  const [hasCompletedTranscript, setHasCompletedTranscript] = useState(false);
+  
   useEffect(() => {
     let intervalId;
     async function fetchCallData() {
@@ -24,38 +28,65 @@ const CallDetails = ({ callId, darkMode }) => {
           return;
         }
         
-        // Try fetching from Supabase first - not needed anymore as backend handles this
+        const now = Date.now();
+        const lastDetailsTime = lastFetchTime.details || 0;
+        const lastTranscriptTime = lastFetchTime.transcript || 0;
+        const lastRecordingTime = lastFetchTime.recording || 0;
         
-        // Fetch call details in parallel
-        const [detailsData, recordingData] = await Promise.all([
-          getCallDetails(callId),
-          getCallRecording(callId)
-        ]);
+        // Intelligent fetching - Only fetch data that needs to be updated
+        let detailsData = details;
+        let recordingData = null;
+        let needTranscriptFetch = false;
         
-        setDetails(detailsData);
-        
-        // NEW: Use the corrected transcript API (which falls back to regular if needed)
-        try {
-          const transcriptData = await getCorrectedTranscript(callId);
-          console.log("Got transcript data:", transcriptData);
+        // Always fetch details on first load or if it's been more than 5 seconds
+        if (!details || now - lastDetailsTime > 5000) {
+          detailsData = await getCallDetails(callId);
+          setDetails(detailsData);
+          setLastFetchTime(prev => ({ ...prev, details: now }));
           
-          if (transcriptData && transcriptData.status === "success" && transcriptData.aligned) {
-            setTranscript(transcriptData.aligned);
-          } else if (transcriptData && transcriptData.status === "success" && transcriptData.transcript) {
-            // Convert plain text transcript to a simple aligned format with a single speaker
-            setTranscript([{ text: transcriptData.transcript, speaker: "Agent" }]);
-          } else if (transcriptData && transcriptData.status === "pending") {
-            // Call is still in progress, keep polling
-            console.log("Call still in progress, waiting for transcript...");
+          // If we have a newly completed call, fetch recording
+          if (detailsData && (detailsData.status === 'success' || detailsData.status === 'completed')) {
+            if (!recordingUrl && now - lastRecordingTime > 5000) {
+              recordingData = await getCallRecording(callId);
+              if (recordingData && (recordingData.status === 'success' || recordingData.recording_url)) {
+                setRecordingUrl(recordingData.recording_url || recordingData.url);
+                setLastFetchTime(prev => ({ ...prev, recording: now }));
+              }
+            }
+            
+            // If call is completed, we need transcript
+            needTranscriptFetch = true;
           }
-        } catch (transcriptError) {
-          console.error("Error fetching transcript:", transcriptError);
-          // Keep the current transcript if there was an error fetching a new one
-          // This prevents flickering when there are temporary API errors
         }
         
-        if (recordingData && (recordingData.status === 'success' || recordingData.recording_url)) {
-          setRecordingUrl(recordingData.recording_url || recordingData.url);
+        // Fetch transcript if not already fetched or if the call is still in progress
+        if (!hasCompletedTranscript && 
+            (needTranscriptFetch || !transcript || now - lastTranscriptTime > 3000)) {
+          try {
+            const transcriptData = await getCorrectedTranscript(callId);
+            setLastFetchTime(prev => ({ ...prev, transcript: now }));
+            
+            if (transcriptData && transcriptData.status === "success" && transcriptData.aligned) {
+              setTranscript(transcriptData.aligned);
+              // If we have aligned transcript and call is complete, stop polling
+              if (detailsData && (detailsData.status === 'success' || detailsData.status === 'completed')) {
+                setHasCompletedTranscript(true);
+              }
+            } else if (transcriptData && transcriptData.status === "success" && transcriptData.transcript) {
+              // Convert plain text transcript to a simple aligned format with a single speaker
+              setTranscript([{ text: transcriptData.transcript, speaker: "Agent" }]);
+              // If we have any transcript and call is complete, stop polling
+              if (detailsData && (detailsData.status === 'success' || detailsData.status === 'completed')) {
+                setHasCompletedTranscript(true);
+              }
+            } else if (transcriptData && transcriptData.status === "pending") {
+              // Call is still in progress, keep polling
+              console.log("Call still in progress, waiting for transcript...");
+            }
+          } catch (transcriptError) {
+            console.error("Error fetching transcript:", transcriptError);
+            // Keep the current transcript if there was an error fetching a new one
+          }
         }
       } catch (err) {
         console.error('Error fetching call data:', err);
@@ -67,10 +98,26 @@ const CallDetails = ({ callId, darkMode }) => {
 
     fetchCallData();
 
-    // Set up refresh interval to poll for updates every 2 seconds for any calls
-    // This ensures transcripts update in real-time as they become available
-    intervalId = setInterval(fetchCallData, 2000);
-    setRefreshInterval(intervalId);
+    // Only set up refresh interval if needed (call is in progress or pending)
+    // And use a smarter approach to reduce API calls
+    if (details && (details.status === 'in-progress' || details.status === 'pending')) {
+      // For in-progress calls, poll every 3 seconds
+      intervalId = setInterval(fetchCallData, 3000);
+      setRefreshInterval(intervalId);
+    } else if (!details) {
+      // For initial load when details aren't fetched yet, do one quick refresh after 2 seconds
+      // then stop if the call is completed
+      intervalId = setTimeout(() => {
+        fetchCallData().then(() => {
+          // After this first refresh, only continue polling if call is still in progress
+          if (details && (details.status === 'in-progress' || details.status === 'pending')) {
+            const newIntervalId = setInterval(fetchCallData, 3000);
+            setRefreshInterval(newIntervalId);
+          }
+        });
+      }, 2000);
+      setRefreshInterval(intervalId);
+    }
 
     return () => {
       if (intervalId) clearInterval(intervalId);
@@ -211,7 +258,7 @@ const CallDetails = ({ callId, darkMode }) => {
                   color: darkMode ? '#9aa0b5' : '#666',
                 }}>
                   <div>To: +{details.phone || details.phone_number}</div>
-                  <div>From: {details.bland_phone || details.from_number || '+19064981948'}</div>
+                  <div>From: {details.from_number || '+19064981948'}</div>
                 </div>
               )}
             </div>
@@ -314,11 +361,42 @@ const CallDetails = ({ callId, darkMode }) => {
               }}>
                 {details && (details.status === 'in-progress' || details.status === 'pending') ? (
                   <div>
-                    <div style={{ marginBottom: 8 }}>Call in progress...</div>
-                    <div style={{ fontSize: 12 }}>Transcript will be available after call completes</div>
+                    <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" style={{ marginRight: 8, animation: 'spin 1s linear infinite' }}>
+                        <style>
+                          {`
+                            @keyframes spin {
+                              0% { transform: rotate(0deg); }
+                              100% { transform: rotate(360deg); }
+                            }
+                          `}
+                        </style>
+                        <path fill="currentColor" d="M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z" />
+                      </svg>
+                      Call in progress...
+                    </div>
+                    <div style={{ fontSize: 12 }}>Transcript is being generated in real-time</div>
+                  </div>
+                ) : details && (details.status === 'success' || details.status === 'completed') ? (
+                  <div>
+                    <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" style={{ marginRight: 8 }}>
+                        <path fill="currentColor" d="M12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M16.24,7.76C15.07,6.58 13.53,6 12,6V12L7.76,16.24C10.1,18.58 13.9,18.58 16.24,16.24C18.59,13.9 18.59,10.1 16.24,7.76Z" />
+                      </svg>
+                      Processing transcript...
+                    </div>
+                    <div style={{ fontSize: 12 }}>Refreshing automatically every second</div>
                   </div>
                 ) : (
-                  'Transcript not available for this call'
+                  <div>
+                    <div style={{ marginBottom: 8 }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24">
+                        <path fill="currentColor" d="M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" />
+                      </svg>
+                    </div>
+                    <div>Transcript not available for this call</div>
+                    <div style={{ fontSize: 12, marginTop: 8 }}>There might have been an issue with the transcription service</div>
+                  </div>
                 )}
               </div>
             )}

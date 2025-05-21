@@ -65,7 +65,7 @@ function App() {
     callsLeft: MAX_CALLS,
     phoneNumber: ''
   });
-  const [appVersion, setAppVersion] = useState('2.0.0');
+  const [appVersion, setAppVersion] = useState('2.1.1');
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [loaderShown, setLoaderShown] = useState(false);

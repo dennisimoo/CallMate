@@ -80,7 +80,7 @@ const MainForm = ({
             borderRadius: 4,
             display: 'inline-block'
           }}>
-            Available Calls: <span style={{ fontWeight: 600 }}>{callsLeft}</span> / {5}
+            Available Calls: <span style={{ fontWeight: 600 }}>{callsLeft}</span> / {isAdmin ? 'Unlimited' : 3}
           </div>
         )}
       </motion.div>
@@ -277,7 +277,7 @@ const MainForm = ({
               boxShadow: darkMode ? 'none' : '0 1px 3px rgba(0,0,0,0.1)'
             }}
           >
-            {status.replace('Bland.ai call triggered!', 'Call triggered!')}
+            {status.includes('call triggered') ? 'Call triggered!' : status}
             {status.includes('Call triggered') && (
               <div style={{marginTop: 5, fontSize: 13, fontWeight: 'normal'}}>
                 The number you chose will receive a call shortly. Please wait...

@@ -1,6 +1,22 @@
 // Simple API utility for backend calls
 const API_BASE = '/api'; // Use /api prefix based on backend configuration
 
+// Function to verify if text is a valid name using Gemini API
+export async function verifyName(name) {
+  try {
+    const res = await fetch(`${API_BASE}/verify-name`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  } catch (error) {
+    console.error("E009: Verify Name Error");
+    throw error;
+  }
+}
+
 export async function triggerCall(phone_number, topic, options = {}) {
   try {
     const res = await fetch(`${API_BASE}/call`, {
@@ -11,7 +27,7 @@ export async function triggerCall(phone_number, topic, options = {}) {
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   } catch (error) {
-    console.error("API Error in triggerCall:", error);
+    console.error("E001: Trigger Call Error");
     throw error;
   }
 }
@@ -33,7 +49,7 @@ export async function getHistory(phone_number, user_id) {
       }
     } else {
       // If we have neither, return empty array
-      console.error("getHistory requires either phone_number or user_id");
+      console.error("E002: Missing Parameters");
       return [];
     }
     
@@ -42,7 +58,7 @@ export async function getHistory(phone_number, user_id) {
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   } catch (error) {
-    console.error("API Error in getHistory:", error);
+    console.error("E003: Get History Error");
     return []; // Return empty array on error to prevent UI crashes
   }
 }
@@ -53,7 +69,7 @@ export async function getCallDetails(call_id) {
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   } catch (error) {
-    console.error("API Error in getCallDetails:", error);
+    console.error("E004: Get Call Details Error");
     throw error;
   }
 }
@@ -64,7 +80,7 @@ export async function getCallTranscript(call_id) {
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   } catch (error) {
-    console.error("API Error in getCallTranscript:", error);
+    console.error("E005: Get Call Transcript Error");
     throw error;
   }
 }
@@ -75,12 +91,12 @@ export async function getCorrectedTranscript(call_id) {
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   } catch (error) {
-    console.error("API Error in getCorrectedTranscript:", error);
+    console.error("E006: Get Corrected Transcript Error");
     // Fall back to regular transcript if corrected isn't available
     try {
       return await getCallTranscript(call_id);
     } catch (fallbackError) {
-      console.error("Fallback transcript also failed:", fallbackError);
+      console.error("E007: Fallback Transcript Error");
       throw error; // Throw original error
     }
   }
@@ -92,7 +108,7 @@ export async function getCallRecording(call_id) {
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   } catch (error) {
-    console.error("API Error in getCallRecording:", error);
+    console.error("E008: Get Call Recording Error");
     throw error;
   }
 }

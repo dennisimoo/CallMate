@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../supabaseClient';
+import GuestOnboarding from './GuestOnboarding';
 
 const Auth = ({ darkMode }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showGuestOnboarding, setShowGuestOnboarding] = useState(false);
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
 
   // Show loader during authentication
   const showAuthLoader = () => {
@@ -67,7 +70,13 @@ const Auth = ({ darkMode }) => {
     }
   };
 
-  const handleGuestLogin = async () => {
+  // Handle click on Continue as Guest button
+  const handleGuestLogin = () => {
+    setShowGuestOnboarding(true);
+  };
+
+  // Handle guest onboarding completion
+  const handleOnboardingComplete = async (guestName) => {
     try {
       // Create a random guest ID
       const guestId = 'guest_' + Math.random().toString(36).substring(2, 15);
@@ -82,7 +91,8 @@ const Auth = ({ darkMode }) => {
             dark_mode: true,
             is_admin: false,
             created_at: new Date(),
-            updated_at: new Date()
+            updated_at: new Date(),
+            name: guestName
           });
           
         if (error && !error.message.includes('duplicate')) {
@@ -97,6 +107,9 @@ const Auth = ({ darkMode }) => {
       
       // Set bypass auth flag
       localStorage.setItem('bypass_auth', 'true');
+      
+      // Store guest name
+      localStorage.setItem('plektu_guest_name', guestName);
       
       // Redirect to main app
       window.location.reload();
@@ -144,23 +157,41 @@ const Auth = ({ darkMode }) => {
     };
   }, []);
 
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.5 }}
-      style={{ 
-        width: 340,
-        padding: 24,
-        borderRadius: 16,
-        backgroundColor: darkMode ? '#222' : '#fff',
-        boxShadow: darkMode ? '0 10px 25px rgba(0,0,0,0.3)' : '0 10px 25px rgba(0,0,0,0.1)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center'
-      }}
-    >
+    <AnimatePresence mode="wait">
+      {showGuestOnboarding ? (
+        <GuestOnboarding 
+          key="guestOnboarding"
+          darkMode={darkMode} 
+          windowSize={windowSize} 
+          onComplete={handleOnboardingComplete} 
+        />
+      ) : (
+        <motion.div
+          key="authScreen"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.5 }}
+          style={{ 
+            width: 340,
+            padding: 24,
+            borderRadius: 16,
+            backgroundColor: darkMode ? '#222' : '#fff',
+            boxShadow: darkMode ? '0 10px 25px rgba(0,0,0,0.3)' : '0 10px 25px rgba(0,0,0,0.1)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center'
+          }}
+        >
       <div style={{
         marginBottom: 24,
         textAlign: 'center'
@@ -305,6 +336,8 @@ const Auth = ({ darkMode }) => {
       )}
       
     </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
 

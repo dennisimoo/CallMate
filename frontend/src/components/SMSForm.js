@@ -77,7 +77,7 @@ const SMSForm = ({
             borderRadius: 4,
             display: 'inline-block'
           }}>
-            Available SMS: <span style={{ fontWeight: 600 }}>{smsLeft}</span> / {10}
+            Available SMS: <span style={{ fontWeight: 600 }}>{smsLeft}</span> / {isAdmin ? 'Unlimited' : 3}
           </div>
         )}
       </motion.div>
